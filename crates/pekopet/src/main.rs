@@ -706,11 +706,24 @@ impl Render for View {
                 .text_color(rgb(0x93a5b7))
                 .child("最近对话"),
         );
+        let mut recent = div()
+            .id("recent-sessions")
+            .flex_1()
+            .min_h_0()
+            .overflow_y_scroll()
+            .flex()
+            .flex_col()
+            .gap_2();
         for s in self.sessions.iter().take(12) {
             let id = s["id"].as_str().unwrap_or("").to_string();
-            let title = s["title"].as_str().unwrap_or("对话").to_string();
+            let title: String = s["title"]
+                .as_str()
+                .unwrap_or("对话")
+                .chars()
+                .take(18)
+                .collect();
             let cwd = s["cwd"].as_str().unwrap_or("").to_string();
-            sidebar = sidebar.child(button(id.clone(), title).on_click(cx.listener(
+            recent = recent.child(button(id.clone(), title).on_click(cx.listener(
                 move |this, _, _, cx| {
                     if !this.busy && this.session != id {
                         this.session = id.clone();
@@ -723,7 +736,7 @@ impl Render for View {
                 },
             )));
         }
-        sidebar = sidebar.child(div().flex_1()).child(
+        sidebar = sidebar.child(recent).child(
             button(
                 "dnd",
                 if self.settings["dnd"].as_bool().unwrap_or(false) {
@@ -1292,7 +1305,7 @@ impl Render for View {
                         }))
                     },
                 )));
-                body=body.child(list).child(button("pet-through","切换鼠标穿透").on_click(cx.listener(|this,_,_,_|this.save(json!({"clickThrough":!this.settings["clickThrough"].as_bool().unwrap_or(false)})))));
+                body=body.child(list).child(button("pet-through",if self.settings["clickThrough"].as_bool().unwrap_or(false){"鼠标穿透已开启 · 点击关闭"}else{"鼠标穿透已关闭 · 点击开启"}).on_click(cx.listener(|this,_,_,_|this.save(json!({"clickThrough":!this.settings["clickThrough"].as_bool().unwrap_or(false)})))));
                 let mut series = self.latencies.clone();
                 series.sort_by(f64::total_cmp);
                 let p95 = if series.is_empty() {
