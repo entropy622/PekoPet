@@ -34,7 +34,7 @@ fn main() {
     let mut files = Vec::new();
     collect(&framework, &mut files);
     files.push(framework.join("Rendering/CubismRenderer.cpp"));
-    files.push(framework.join("Rendering/CubismBlendMode.cpp"));
+    files.push(framework.join("Rendering/csmBlendMode.cpp"));
     collect(&framework.join("Rendering/D3D11"), &mut files);
     files.push(root.join("native/peko.cpp"));
     let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
