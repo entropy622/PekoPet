@@ -116,7 +116,7 @@ struct Pet{
         MONITORINFOEXW info{};info.cbSize=sizeof(info);GetMonitorInfoW(monitor,&info);work=info.rcWork;
         WideCharToMultiByte(CP_UTF8,0,info.szDevice,-1,monitorName,sizeof(monitorName),nullptr,nullptr);
         dpi=GetDpiForWindow(hwnd);if(!dpi)dpi=96;
-        state.x=std::clamp<int>(state.x,work.left-state.width+80,work.right-80);state.y=std::clamp<int>(state.y,work.top,work.bottom-80);
+        state.x=std::clamp<int>(state.x,work.left,std::max<int>(work.left,work.right-state.width));state.y=std::clamp<int>(state.y,work.top,std::max<int>(work.top,work.bottom-state.height));
         LONG_PTR ex=WS_EX_TOOLWINDOW|WS_EX_NOACTIVATE|WS_EX_NOREDIRECTIONBITMAP;
         if(state.through)ex|=WS_EX_TRANSPARENT;
         SetWindowLongPtrW(hwnd,GWL_EXSTYLE,ex);

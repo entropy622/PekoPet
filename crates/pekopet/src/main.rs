@@ -84,6 +84,7 @@ fn button(id: impl Into<SharedString>, text: impl Into<SharedString>) -> Statefu
         .id(ElementId::Name(id.into()))
         .px_3()
         .py_2()
+        .flex_shrink_0()
         .rounded_md()
         .bg(rgb(0x29333f))
         .text_color(rgb(0xe8eef3))
@@ -1112,8 +1113,16 @@ impl Render for View {
                 body = body.child(div().text_sm().child(
                     "使用 dsh 已配置的提供方与凭据。选择模型后重新连接，不会重发未完成任务。",
                 ));
+                let mut model_list = div()
+                    .id("models")
+                    .flex_1()
+                    .min_h_0()
+                    .overflow_y_scroll()
+                    .flex()
+                    .flex_col()
+                    .gap_2();
                 for p in self.providers.clone() {
-                    body = body.child(
+                    model_list = model_list.child(
                         div()
                             .mt_3()
                             .text_color(rgb(0xb1c4be))
@@ -1122,19 +1131,22 @@ impl Render for View {
                     for m in p["models"].as_array().unwrap_or(&Vec::new()) {
                         let provider = p["id"].as_str().unwrap_or("").to_string();
                         let model = m["id"].as_str().unwrap_or("").to_string();
-                        body = body.child(
-                            button(format!("{provider}/{model}"), model.clone()).on_click(
-                                cx.listener(move |this, _, _, cx| {
+                        model_list = model_list.child(
+                            button(format!("{provider}/{model}"), model.clone())
+                                .when(self.provider == provider && self.model == model, |s| {
+                                    s.bg(rgb(0x45524f))
+                                })
+                                .on_click(cx.listener(move |this, _, _, cx| {
                                     this.provider = provider.clone();
                                     this.model = model.clone();
                                     this.save(json!({"provider":provider,"model":model}));
                                     cx.notify();
-                                }),
-                            ),
+                                })),
                         );
                     }
                 }
                 body = body
+                    .child(model_list)
                     .child(
                         button("reconnect", "重新连接 dsh")
                             .mt_4()
