@@ -1,4 +1,6 @@
+#ifndef NOMINMAX
 #define NOMINMAX
+#endif
 #define WIN32_LEAN_AND_MEAN
 #include "peko.h"
 #include <windows.h>
@@ -33,7 +35,7 @@
 #include <Effect/CubismEyeBlink.hpp>
 #include <Effect/CubismBreath.hpp>
 #include <Physics/CubismPhysics.hpp>
-#include <Pose/CubismPose.hpp>
+#include <Effect/CubismPose.hpp>
 #include <Rendering/D3D11/CubismRenderer_D3D11.hpp>
 
 using namespace Live2D::Cubism::Framework;

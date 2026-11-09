@@ -14,6 +14,8 @@ jobs:
           node-version: '24'
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm rebuild @deepseek-ai/dsh-subprocess-local koffi node-pty protobufjs
       - run: npm test
@@ -30,6 +32,9 @@ jobs:
           Invoke-WebRequest 'https://cubism.live2d.com/sdk-native/bin/CubismSdkForNative-5-r.5.zip' -OutFile local/sdk/native.zip
           Expand-Archive local/sdk/native.zip -DestinationPath local/sdk
           ./scripts/import-sdk.ps1 -SdkPath local/sdk/CubismSdkForNative-5-r.5
+      - name: Check native bridge before release optimization
+        if: github.repository == 'entropy622/PekoPet' && github.event_name != 'pull_request'
+        run: cargo check -p pekopet --locked
       - name: Build native portable candidate
         if: github.repository == 'entropy622/PekoPet' && github.event_name != 'pull_request'
         run: npm run package:windows -- -DestinationPath dist/PekoPet-windows-x64
