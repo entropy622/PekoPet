@@ -44,6 +44,8 @@ unsafe extern "C" {
     fn peko_motion(p: *mut c_void, file: *const c_char) -> i32;
     fn peko_tick(p: *mut c_void, dt: f32) -> i32;
     fn peko_window_state(p: *mut c_void) -> Rect;
+    fn peko_monitor(p: *mut c_void) -> *const c_char;
+    fn peko_dpi(p: *mut c_void) -> i32;
     fn peko_configure(p: *mut c_void, state: Rect);
     fn peko_show_chat(hwnd: isize, show: i32);
     fn peko_notify(p: *mut c_void);
@@ -299,7 +301,9 @@ impl Native {
                     }
                     if e & 4 != 0 {
                         let r = unsafe { peko_window_state(ptr) };
-                        events.send(json!({"native":"settings","patch":{"petX":r.x,"petY":r.y,"petScale":r.scale,"topmost":r.topmost!=0,"clickThrough":r.through!=0}}))?;
+                        let monitor = unsafe { s(peko_monitor(ptr)) };
+                        let dpi = unsafe { peko_dpi(ptr) };
+                        events.send(json!({"native":"settings","patch":{"petX":r.x,"petY":r.y,"petScale":r.scale,"petMonitor":monitor,"petDpi":dpi,"topmost":r.topmost!=0,"clickThrough":r.through!=0}}))?;
                     }
                     if e & 8 != 0 {
                         active_until = Instant::now() + Duration::from_millis(250);

@@ -20,6 +20,8 @@ void peko_parameter(void* pet,const char* id,float value);
 int peko_motion(void* pet,const char* file);
 int peko_tick(void* pet,float delta_seconds);
 PekoRect peko_window_state(void* pet);
+const char* peko_monitor(void* pet);
+int peko_dpi(void* pet);
 void peko_configure(void* pet,PekoRect state);
 void peko_show_chat(intptr_t hwnd,int show);
 void peko_notify(void* pet);

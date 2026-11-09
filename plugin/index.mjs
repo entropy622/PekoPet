@@ -20,7 +20,8 @@ export function apply(ctx) {
   const owned=new Set(), pending=new Map(), avatars=new Map(), workers=new Set(),memoryResults=new Map(),proactiveRestrictions=new Map(),memoryHandles=new Map(),background=new Set(),lineage=new Map();
   function own(id){owned.add(id);lineage.set(id,id);}
   ctx.on('session/created',session=>{const parent=String(session.header.parentSession??'');if(lineage.has(parent))lineage.set(String(session.id),lineage.get(parent));});
-  let route, closing=false, lastActivity=Date.now(), idleGreetingAt=0;
+  let route, closing=false, lastActivity=Date.now(), idleGreetingAt=0,activeSession;
+  const companionMessages=new Set();
   const notify=(method,params)=>transport.notify(method,params);
   const error=e=>{console.error('[PekoPet]',e?.stack??String(e));notify('peko.error',{message:String(e?.message??e)});};
   // Native Schedule delivery needs an Agent resolver, without browser file-upload services.
@@ -62,7 +63,8 @@ export function apply(ctx) {
   ctx.on('agent/inbox/claimed',({agent,message})=>{
     const id=String(agent.session.id);
     if(message.source?.kind==='user'){proactiveRestrictions.get(id)?.();proactiveRestrictions.delete(id);}
-    if(owned.has(id)&&message.source?.kind==='schedule')notify('peko.reminder',{sessionId:id,text:textOf(message)});
+    const companion=companionMessages.delete(message.id);
+    if(owned.has(id)&&message.source?.kind==='schedule'&&!companion)notify('peko.reminder',{sessionId:id,text:textOf(message)});
   });
   ctx.on('session/event',(session,event)=>{
     const id=String(session.id);
@@ -131,7 +133,7 @@ export function apply(ctx) {
     const cwd=(await sdk.getWorkingDirectory({sessionId})).cwd;
     state.rememberSession(sessionId,cwd);
     if(p.avatar)avatars.set(sessionId,{catalog:p.avatar,state:state.avatarState(sessionId)});
-    lastActivity=Date.now();return sdk.prompt(p);
+    activeSession=sessionId;lastActivity=Date.now();return sdk.prompt(p);
   }
   async function request(method,p={}) {
     if(method==='peko.capabilities')return caps(p);
@@ -142,7 +144,7 @@ export function apply(ctx) {
     }
     if(method==='session/prompt')return prompt(p);
     if(method==='session/resume') {own(requiredString(p,'sessionId'));return sdk.resume(p);}
-    if(method==='peko.open') {const id=requiredString(p,'sessionId');own(id);return ctx.agents.get(id)?{}:sdk.resume({sessionId:id});}
+    if(method==='peko.open') {const id=requiredString(p,'sessionId');own(id);activeSession=id;return ctx.agents.get(id)?{}:sdk.resume({sessionId:id});}
     if(method==='peko.history'){const id=requiredString(p,'sessionId');return {messages:state.messages(id),avatarState:state.avatarState(id)};}
     if(method==='peko.sessions')return {sessions:state.sessions()};
     if(method==='peko.settings')return p.patch?state.updateSettings(p.patch):state.settings();
@@ -189,10 +191,11 @@ export function apply(ctx) {
     if(closing||!route||!owned.size)return;
     const idle=(Date.now()-lastActivity)/60000,now=new Date();
     if(Date.now()-idleGreetingAt<state.settings().idleMinutes*60000||!state.greetingAllowed(now,idle))return;
-    const agent=[...owned].map(id=>ctx.agents.get(id)).find(a=>a?.status==='idle');if(!agent)return;
+    const agent=activeSession?ctx.agents.get(activeSession):undefined;if(agent?.status!=='idle')return;
     state.markGreeting(now);idleGreetingAt=Date.now();
     proactiveRestrictions.set(String(agent.session.id),agent.ctx.tools.restrict({allow:[]}));
-    agent.followup(createUserMessage({content:[{type:'text',text:'[PekoPet 主动陪伴事件] 用户暂时没有发言。可以用一句轻松、不催促的中文关心或招呼；不要推测用户正在做什么，不调用工作工具。'}],source:{kind:'schedule'}}));
+    const message=createUserMessage({content:[{type:'text',text:'[PekoPet 主动陪伴事件] 用户暂时没有发言。可以用一句轻松、不催促的中文关心或招呼；不要推测用户正在做什么，不调用工作工具。'}],source:{kind:'schedule'}});
+    companionMessages.add(message.id);agent.followup(message);
   },30_000);timer.unref();
   let disposed;
   function dispose(){return disposed??=(async()=>{closing=true;clearInterval(timer);for(const p of [...pending.values()])p.settle(p.kind==='approval'?'cancelled':{answers:[]});for(const handle of memoryHandles.values())handle.agent.cancel({kind:'disposed'});await Promise.allSettled(background);await sdk.shutdown();await transport.flush();transport.close();state.close();})();}

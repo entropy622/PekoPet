@@ -107,10 +107,12 @@ struct Pet{
     ComPtr<ID3D11Device> device;ComPtr<ID3D11DeviceContext> context;ComPtr<IDXGISwapChain1> swap;
     ComPtr<ID3D11RenderTargetView> target;ComPtr<IDCompositionDevice> composition;ComPtr<IDCompositionTarget> compTarget;ComPtr<IDCompositionVisual> visual;
     std::vector<ComPtr<ID3D11ShaderResourceView>> textures;std::unique_ptr<Model> model;
-    NOTIFYICONDATAW tray{};bool frameworkStarted=false,comStarted=false;CubismFramework::Option option;
+    NOTIFYICONDATAW tray{};bool frameworkStarted=false,comStarted=false;CubismFramework::Option option;char monitorName[128]{};int dpi=96;
     void place(){
         RECT work{},bounds{state.x,state.y,state.x+state.width,state.y+state.height};HMONITOR monitor=MonitorFromRect(&bounds,MONITOR_DEFAULTTONEAREST);
-        MONITORINFO info{sizeof(info)};GetMonitorInfoW(monitor,&info);work=info.rcWork;
+        MONITORINFOEXW info{};info.cbSize=sizeof(info);GetMonitorInfoW(monitor,&info);work=info.rcWork;
+        WideCharToMultiByte(CP_UTF8,0,info.szDevice,-1,monitorName,sizeof(monitorName),nullptr,nullptr);
+        dpi=GetDpiForWindow(hwnd);if(!dpi)dpi=96;
         state.x=std::clamp<int>(state.x,work.left-state.width+80,work.right-80);state.y=std::clamp<int>(state.y,work.top,work.bottom-80);
         LONG_PTR ex=WS_EX_TOOLWINDOW|WS_EX_NOACTIVATE|WS_EX_NOREDIRECTIONBITMAP;
         if(state.through)ex|=WS_EX_TRANSPARENT;
@@ -142,8 +144,8 @@ struct Pet{
             case WM_RBUTTONUP:p->menu();return 0;
             case WM_HOTKEY:if(w==1)p->events|=1;else{p->state.through=!p->state.through;p->place();p->events|=4;}return 0;
             case WM_APP+1:if(l==WM_LBUTTONUP||l==NIN_BALLOONUSERCLICK)p->events|=1;if(l==WM_RBUTTONUP)p->menu();return 0;
-            case WM_DISPLAYCHANGE:p->place();return 0;
-            case WM_DPICHANGED:p->place();return 0;
+            case WM_DISPLAYCHANGE:p->place();p->events|=4;return 0;
+            case WM_DPICHANGED:p->place();p->events|=4;return 0;
             case WM_CLOSE:p->state.visible=0;p->place();return 0;
         }return DefWindowProcW(hwnd,msg,w,l);
     }
@@ -162,7 +164,7 @@ struct Pet{
         CubismRenderer_D3D11::SetConstantSettings(2,device.Get());model=std::make_unique<Model>();model->load(path(file));model->CreateRenderer(state.width,state.height);
         textures.resize(model->setting->GetTextureCount());
         tray.cbSize=sizeof(tray);tray.hWnd=hwnd;tray.uID=1;tray.uFlags=NIF_MESSAGE|NIF_ICON|NIF_TIP;tray.uCallbackMessage=WM_APP+1;tray.hIcon=LoadIconW(nullptr,IDI_APPLICATION);wcscpy_s(tray.szTip,L"PekoPet · Ctrl+Alt+P");Shell_NotifyIconW(NIM_ADD,&tray);
-        RegisterHotKey(hwnd,1,MOD_CONTROL|MOD_ALT|MOD_NOREPEAT,'P');RegisterHotKey(hwnd,2,MOD_CONTROL|MOD_ALT|MOD_SHIFT|MOD_NOREPEAT,'P');place();
+        RegisterHotKey(hwnd,1,MOD_CONTROL|MOD_ALT|MOD_NOREPEAT,'P');RegisterHotKey(hwnd,2,MOD_CONTROL|MOD_ALT|MOD_SHIFT|MOD_NOREPEAT,'P');place();events|=4;
     }
     void draw(float dt){
         if(!state.visible)return;
@@ -174,7 +176,15 @@ struct Pet{
         model->GetModelMatrix()->SetHeight(1.85f*state.scale);model->GetModelMatrix()->SetCenterPosition(0,0);
         CubismMatrix44 projection;projection.Scale((float)state.height/state.width,1);projection.MultiplyByMatrix(model->GetModelMatrix());renderer->SetMvpMatrix(&projection);renderer->IsPremultipliedAlpha(false);renderer->DrawModel();renderer->EndFrame();check(swap->Present(1,0),"Present");
     }
-    ~Pet(){Shell_NotifyIconW(NIM_DELETE,&tray);if(hwnd){UnregisterHotKey(hwnd,1);UnregisterHotKey(hwnd,2);}model.reset();if(frameworkStarted){CubismRenderer::StaticRelease();CubismFramework::Dispose();CubismFramework::CleanUp();}if(hwnd)DestroyWindow(hwnd);if(comStarted)CoUninitialize();}
+    ~Pet(){
+        Shell_NotifyIconW(NIM_DELETE,&tray);
+        if(hwnd){UnregisterHotKey(hwnd,1);UnregisterHotKey(hwnd,2);}
+        model.reset();
+        if(frameworkStarted){CubismRenderer::StaticRelease();CubismFramework::Dispose();CubismFramework::CleanUp();}
+        visual.Reset();compTarget.Reset();composition.Reset();target.Reset();swap.Reset();textures.clear();context.Reset();device.Reset();
+        if(hwnd)DestroyWindow(hwnd);
+        if(comStarted)CoUninitialize();
+    }
 };
 
 extern "C" {
@@ -194,6 +204,8 @@ void peko_parameter(void* p,const char* id,float value){auto& e=((Pet*)p)->model
 int peko_motion(void* p,const char* file){try{((Pet*)p)->model->motion(path(file));return 1;}catch(const std::exception& e){last_error=e.what();return 0;}}
 int peko_tick(void* raw,float dt){auto p=(Pet*)raw;MSG msg;while(PeekMessageW(&msg,nullptr,0,0,PM_REMOVE)){TranslateMessage(&msg);DispatchMessageW(&msg);}try{p->draw(dt);}catch(const std::exception& e){last_error=e.what();return -1;}int e=p->events;p->events=0;return e;}
 PekoRect peko_window_state(void* p){return ((Pet*)p)->state;}
+const char* peko_monitor(void* p){return ((Pet*)p)->monitorName;}
+int peko_dpi(void* p){return ((Pet*)p)->dpi;}
 void peko_configure(void* p,PekoRect s){((Pet*)p)->state=s;((Pet*)p)->place();}
 void peko_show_chat(intptr_t hwnd,int show){if(show){ShowWindow((HWND)hwnd,SW_RESTORE);SetForegroundWindow((HWND)hwnd);}else ShowWindow((HWND)hwnd,SW_HIDE);}
 void peko_notify(void* raw){auto p=(Pet*)raw;auto info=p->tray;info.uFlags=NIF_INFO;info.dwInfoFlags=NIIF_INFO|NIIF_NOSOUND;wcscpy_s(info.szInfoTitle,L"PekoPet");wcscpy_s(info.szInfo,L"这件事处理好了，点我查看。");Shell_NotifyIconW(NIM_MODIFY,&info);}

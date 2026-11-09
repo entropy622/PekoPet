@@ -8,6 +8,7 @@ export const defaultSettings = {
   memoryEnabled: true, proactive: true, dnd: false, idleMinutes: 60,
   activeStart: 9, activeEnd: 22, maxDailyGreetings: 2,
   petX: 1100, petY: 400, petWidth: 400, petHeight: 600, petScale: 1,
+  petMonitor: '', petDpi: 96,
   topmost: true, clickThrough: false, avatar: 'yumi', provider: '', model: '',
 };
 
