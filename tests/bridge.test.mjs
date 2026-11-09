@@ -32,6 +32,11 @@ test('real dsh loop shares MCP and skills, streams, remembers, approves, asks an
   const inventory=await call('peko.capabilities',{sessionId:'root'});assert.ok(inventory.tools.some(t=>t.name==='mcp__fixture__echo'));assert.ok(inventory.skills.skills.some(s=>s.name==='peko-fixture'));
   await until(e=>e.method==='peko.memory.changed');const memories=await call('peko.memory');assert.equal(memories.memories[0].text,'用户喜欢兔子');
   await call('peko.memory',{action:'delete',id:memories.memories[0].id});assert.equal((await call('peko.memory')).memories.length,0);
+  for(const text of ['我喜欢 Rust','我喜欢 GPUI']){
+    await call('session/prompt',{sessionId:'memory-race',contentBlocks:[{type:'text',text}]});await call('session/wait',{sessionId:'memory-race'});
+  }
+  await until(e=>e.method==='peko.memory.changed'&&e.params.memories.some(m=>m.text==='用户喜欢 GPUI'));
+  assert.ok((await call('peko.memory')).memories.some(m=>m.text==='用户喜欢 Rust'));
   await call('session/prompt',{sessionId:'mcp',contentBlocks:[{type:'text',text:'mcp'}]});
   await call('session/wait',{sessionId:'mcp'});
   assert.ok(events.some(e=>e.method==='peko.work'&&e.params.sessionId==='mcp'&&JSON.stringify(e.params.event).includes('MCP shared configuration round trip')));

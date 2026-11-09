@@ -128,6 +128,7 @@ export function apply(ctx) {
       }
       state.advanceMemory(sessionId,seq);notify('peko.memory.changed',{memories:state.memories()});
     } finally {workers.delete(sessionId);memoryResults.delete(memoryId);memoryHandles.delete(memoryId);if(handle)await handle.dispose();}
+    if(!closing&&state.settings().memoryEnabled&&ctx.agents.get(sessionId)?.status==='idle'&&state.pendingUserFacts(sessionId).length)await extractMemory(sessionId);
   }
   async function prompt(p) {
     const sessionId=requiredString(p,'sessionId');own(sessionId);

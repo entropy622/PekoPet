@@ -163,6 +163,7 @@ struct Pet{
         }return DefWindowProcW(hwnd,msg,w,l);
     }
     void init(const char* file){
+        if(!state.positioned){MONITORINFO info{sizeof(info)};GetMonitorInfoW(MonitorFromPoint(POINT{0,0},MONITOR_DEFAULTTOPRIMARY),&info);state.x=info.rcWork.right-state.width-24;state.y=info.rcWork.bottom-state.height-24;state.positioned=1;}
         HRESULT com=CoInitializeEx(nullptr,COINIT_APARTMENTTHREADED);comStarted=SUCCEEDED(com);if(FAILED(com)&&com!=RPC_E_CHANGED_MODE)check(com,"CoInitializeEx");
         WNDCLASSW wc{};wc.lpfnWndProc=proc;wc.hInstance=GetModuleHandleW(nullptr);wc.lpszClassName=L"PekoPet.Native";wc.hCursor=LoadCursorW(nullptr,IDC_ARROW);RegisterClassW(&wc);
         hwnd=CreateWindowExW(WS_EX_TOOLWINDOW|WS_EX_NOACTIVATE|WS_EX_NOREDIRECTIONBITMAP,wc.lpszClassName,L"PekoPet 桌宠",WS_POPUP,state.x,state.y,state.width,state.height,nullptr,nullptr,wc.hInstance,this);if(!hwnd)throw std::runtime_error("CreateWindow failed");

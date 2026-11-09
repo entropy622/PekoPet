@@ -3,7 +3,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-typedef struct PekoRect { int x,y,width,height; float scale; int topmost,through,visible; } PekoRect;
+typedef struct PekoRect { int x,y,width,height; float scale; int topmost,through,visible,positioned; } PekoRect;
 void* peko_create(const char* model_json, PekoRect state);
 void peko_destroy(void* pet);
 const char* peko_error(void);

@@ -26,6 +26,7 @@ struct Rect {
     topmost: i32,
     through: i32,
     visible: i32,
+    positioned: i32,
 }
 unsafe extern "C" {
     fn peko_create(path: *const c_char, state: Rect) -> *mut c_void;
@@ -137,6 +138,9 @@ fn rect(settings: &Value) -> Rect {
         topmost: settings["topmost"].as_bool().unwrap_or(true) as i32,
         through: settings["clickThrough"].as_bool().unwrap_or(false) as i32,
         visible: 1,
+        positioned: settings["petMonitor"]
+            .as_str()
+            .is_some_and(|s| !s.is_empty()) as i32,
     }
 }
 

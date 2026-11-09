@@ -34,7 +34,9 @@ export function apply(ctx){
       if(extraction){
         if(options.tools?.length)throw new Error('memory extractor received tools');
         const data=options.messages.filter(m=>m.role==='user').map(m=>m.content.filter(b=>b.type==='text').map(b=>b.text).join('')).find(s=>s.startsWith('{"messages":'));
-        const payload=JSON.parse(data);text=JSON.stringify([{text:'用户喜欢兔子',sourceSeq:payload.messages.at(-1).seq}]);
+        const payload=JSON.parse(data),facts=new Map([['我喜欢兔子','用户喜欢兔子'],['我喜欢 Rust','用户喜欢 Rust'],['我喜欢 GPUI','用户喜欢 GPUI']]);
+        await setTimeout(200,undefined,{signal:options.signal});
+        text=JSON.stringify(payload.messages.flatMap(m=>facts.has(m.text)?[{text:facts.get(m.text),sourceSeq:m.seq}]:[]));
       }else{
         if(!options.tools?.length)throw new Error('desktop preset tools missing');
         if(last==='mcp'&&!options.messages.some(m=>m.role==='tool'&&m.toolCallId==='fixture-echo')){
