@@ -16,6 +16,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
+          shared-key: windows-native-v1
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm rebuild @deepseek-ai/dsh-subprocess-local koffi node-pty protobufjs
       - run: npm test
