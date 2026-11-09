@@ -1,4 +1,4 @@
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
 use peko_core::{AvatarState, Catalog, Cue, Parameter};
 use serde_json::{Value, json};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -73,7 +73,7 @@ pub enum Command {
     Notify,
 }
 pub struct Native {
-    pub tx: Sender<(Command, Instant)>,
+    pub tx: Sender<(Command, Option<Instant>)>,
 }
 pub fn show_chat(hwnd: isize, show: bool) {
     unsafe { peko_show_chat(hwnd, show as i32) }
@@ -136,7 +136,7 @@ fn rect(settings: &Value) -> Rect {
 
 impl Native {
     pub fn start(file: PathBuf, settings: Value, events: Sender<Value>) -> Self {
-        let (tx, rx) = mpsc::channel();
+        let (tx, rx) = mpsc::channel::<(Command, Option<Instant>)>();
         thread::spawn(move || {
             let result = (|| -> Result<()> {
                 let name = c(&file.to_string_lossy())?;
@@ -205,7 +205,7 @@ impl Native {
                 let mut previous = Instant::now();
                 let mut state = AvatarState::default();
                 let mut active_until = Instant::now();
-                let mut latency = Vec::new();
+                let mut latency: Vec<Instant> = Vec::new();
                 loop {
                     let frame_started = Instant::now();
                     for (command, received_at) in rx.try_iter() {
@@ -249,7 +249,9 @@ impl Native {
                                     }
                                 }
                                 active_until = Instant::now() + Duration::from_secs(2);
-                                latency.push(received_at);
+                                if let Some(at) = received_at {
+                                    latency.push(at);
+                                }
                             }
                         }
                     }

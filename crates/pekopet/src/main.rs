@@ -52,6 +52,7 @@ struct View {
     messages: Vec<Message>,
     sessions: Vec<Value>,
     approvals: Vec<Value>,
+    reminders: Vec<Value>,
     memories: Vec<Value>,
     settings: Value,
     providers: Vec<Value>,
@@ -116,6 +117,7 @@ impl View {
             }],
             sessions: Vec::new(),
             approvals: Vec::new(),
+            reminders: Vec::new(),
             memories: Vec::new(),
             settings: json!({}),
             providers: Vec::new(),
@@ -203,7 +205,7 @@ impl View {
     }
     fn native_command(&self, command: Command) {
         if let Some(p) = &self.native {
-            let _ = p.tx.send((command, Instant::now()));
+            let _ = p.tx.send((command, None));
         }
     }
     fn local_state(&self, state: &str) {
@@ -250,7 +252,7 @@ impl View {
         self.call("session/prompt",json!({"sessionId":self.session,"contentBlocks":[{"type":"text","text":text}],"avatar":self.catalog}),Reply::Ordinary);
         cx.notify();
     }
-    fn outputs(&mut self, out: Vec<Output>) {
+    fn outputs(&mut self, out: Vec<Output>, received_at: Option<Instant>) {
         for item in out {
             match item {
                 Output::Text(text) => {
@@ -271,7 +273,12 @@ impl View {
                 Output::Cue(mut cue) => match self.catalog.validate(&mut cue) {
                     Ok(()) => {
                         self.semantic_cues = true;
-                        self.native_command(Command::Cue(cue));
+                        if let Some(p) = &self.native {
+                            let _ = p.tx.send((
+                                Command::Cue(cue),
+                                Some(received_at.unwrap_or_else(Instant::now)),
+                            ));
+                        }
                     }
                     Err(e) => self.error = e,
                 },
@@ -429,6 +436,7 @@ impl View {
         match e["method"].as_str().unwrap_or("") {
             "peko.stream" if p["sessionId"].as_str() == Some(&self.session) => {
                 let f = &p["frame"];
+                let received_at = e["receivedMicros"].as_u64().map(rpc::arrival);
                 let attempt = f["attemptId"].as_str().unwrap_or("");
                 let rev = f["revision"].as_u64().unwrap_or(0);
                 match f["type"].as_str().unwrap_or("") {
@@ -453,7 +461,7 @@ impl View {
                                             .entry(c["index"].as_u64().unwrap_or(0))
                                             .or_default()
                                             .push(c["text"].as_str().unwrap_or(""));
-                                        self.outputs(out);
+                                        self.outputs(out, received_at);
                                     }
                                     "tool-call-delta" => {
                                         if let Some(name) = c["name"].as_str() {
@@ -478,7 +486,7 @@ impl View {
                         if self.final_reconciled {
                             out.retain(|o| !matches!(o, Output::Text(_)));
                         }
-                        self.outputs(out);
+                        self.outputs(out, received_at);
                         self.parsers.clear();
                         if f["outcome"]["eventType"] == "assistant/attempt"
                             || f["outcome"]["kind"] == "abandoned"
@@ -578,6 +586,12 @@ impl View {
             }
             "peko.memory.changed" => {
                 self.memories = p["memories"].as_array().cloned().unwrap_or_default()
+            }
+            "peko.reminder" => {
+                self.reminders.push(p.clone());
+                if !self.settings["dnd"].as_bool().unwrap_or(false) {
+                    self.native_command(Command::Notify);
+                }
             }
             "peko.error" => self.error = p["message"].as_str().unwrap_or("dsh 故障").into(),
             _ => {}
@@ -737,6 +751,32 @@ impl Render for View {
                     .bg(rgb(0x4a2e34))
                     .text_sm()
                     .child(self.error.clone()),
+            );
+        }
+        for reminder in self.reminders.clone() {
+            let id = reminder["sessionId"].as_str().unwrap_or("").to_string();
+            let label = if self.busy {
+                "有一条到期提醒 · 当前任务结束后查看"
+            } else {
+                "有一条到期提醒 · 查看对话"
+            };
+            body = body.child(
+                button(format!("reminder-{id}"), label).on_click(cx.listener(
+                    move |this, _, _, cx| {
+                        if this.busy {
+                            return;
+                        }
+                        this.session = id.clone();
+                        if let Some(s) = this.sessions.iter().find(|s| s["id"] == id) {
+                            this.cwd = s["cwd"].as_str().unwrap_or(&this.cwd).to_string();
+                        }
+                        this.call("peko.open", json!({"sessionId":id}), Reply::Ordinary);
+                        this.call("peko.history", json!({"sessionId":id}), Reply::History);
+                        this.reminders.retain(|r| r["sessionId"] != id);
+                        this.tab = Tab::Chat;
+                        cx.notify();
+                    },
+                )),
             );
         }
         match self.tab {

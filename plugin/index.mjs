@@ -62,6 +62,7 @@ export function apply(ctx) {
   ctx.on('agent/inbox/claimed',({agent,message})=>{
     const id=String(agent.session.id);
     if(message.source?.kind==='user'){proactiveRestrictions.get(id)?.();proactiveRestrictions.delete(id);}
+    if(owned.has(id)&&message.source?.kind==='schedule')notify('peko.reminder',{sessionId:id,text:textOf(message)});
   });
   ctx.on('session/event',(session,event)=>{
     const id=String(session.id);

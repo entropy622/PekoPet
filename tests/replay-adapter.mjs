@@ -2,6 +2,12 @@ import { LlmAdapter } from '@deepseek-ai/dsh-llm';
 import { setTimeout } from 'node:timers/promises';
 export const name='peko-test-adapter';
 export const inject=['llm','approval','userQuestions'];
+function* toolCall(id,name,args){
+  const block={type:'tool-call',id,name,arguments:JSON.stringify(args)};
+  yield {type:'block-start',index:0,blockType:'tool-call'};
+  yield {type:'tool-call-delta',index:0,id,name,argumentsDelta:block.arguments};
+  yield {type:'block-end',index:0,block};yield {type:'finish',reason:{kind:'tool-calls'}};
+}
 export function apply(ctx){
   const prompts=new Map();
   ctx.on('agent/inbox/claimed',({agent,message})=>{if(message.source?.kind==='user')prompts.set(String(agent.session.id),message.content.filter(b=>b.type==='text').map(b=>b.text).join(''));});
@@ -23,6 +29,7 @@ export function apply(ctx){
       const system=options.messages.filter(m=>m.role==='system').map(m=>m.content.filter(b=>b.type==='text').map(b=>b.text).join('')).join('');
       const last=options.messages.filter(m=>m.role==='user'&&m.source?.kind==='user').at(-1)?.content.filter(b=>b.type==='text').map(b=>b.text).join('')??'';
       const extraction=system.includes('sourceSeq')&&system.includes('提取');
+      const reminder=options.messages.filter(m=>m.role==='user').at(-1)?.source?.kind==='schedule';
       let text;
       if(extraction){
         if(options.tools?.length)throw new Error('memory extractor received tools');
@@ -31,13 +38,17 @@ export function apply(ctx){
       }else{
         if(!options.tools?.length)throw new Error('desktop preset tools missing');
         if(last==='mcp'&&!options.messages.some(m=>m.role==='tool'&&m.toolCallId==='fixture-echo')){
-          const block={type:'tool-call',id:'fixture-echo',name:'mcp__fixture__echo',arguments:JSON.stringify({text:'MCP shared configuration round trip'})};
-          yield {type:'block-start',index:0,blockType:'tool-call'};
-          yield {type:'tool-call-delta',index:0,id:block.id,name:block.name,argumentsDelta:block.arguments};
-          yield {type:'block-end',index:0,block};yield {type:'finish',reason:{kind:'tool-calls'}};return;
+          yield* toolCall('fixture-echo','mcp__fixture__echo',{text:'MCP shared configuration round trip'});return;
         }
         if(last==='mcp'&&!options.messages.filter(m=>m.role==='tool').some(m=>JSON.stringify(m.content).includes('MCP shared configuration round trip')))throw new Error('MCP result missing');
-        text='[[peko:{"mix":{"星星眼":0.8},"hold":1000}]]你好，我是 Peko。';
+        if(last==='files'){
+          const results=options.messages.filter(m=>m.role==='tool');
+          if(results.some(m=>m.isError))throw new Error('Filesystem tool failed: '+JSON.stringify(results));
+          if(!results.some(m=>m.toolCallId==='fixture-read')){yield* toolCall('fixture-read','read',{file_path:'fixture.txt'});return;}
+          if(!results.some(m=>m.toolCallId==='fixture-edit')){yield* toolCall('fixture-edit','edit',{file_path:'fixture.txt',old_string:'before',new_string:'after'});return;}
+        }
+        if(last==='schedule'&&!options.messages.some(m=>m.role==='tool'&&m.toolCallId==='fixture-schedule')){yield* toolCall('fixture-schedule','schedule_create',{title:'喝水提醒',prompt:'提醒用户喝水',after_seconds:2});return;}
+        text=reminder?'提醒到了，喝点水吧。':'[[peko:{"mix":{"星星眼":0.8},"hold":1000}]]你好，我是 Peko。';
       }
       yield {type:'block-start',index:0,blockType:'text'};
       for(const char of text){if(last==='cancel')await setTimeout(80,undefined,{signal:options.signal});yield{type:'text-delta',index:0,text:char};}

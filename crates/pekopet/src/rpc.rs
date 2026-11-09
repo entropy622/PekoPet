@@ -7,11 +7,16 @@ use std::{
     path::PathBuf,
     process::{Child, Command, Stdio},
     sync::{
-        Arc, Mutex,
+        Arc, LazyLock, Mutex,
         mpsc::{self, Sender},
     },
     thread,
+    time::{Duration, Instant},
 };
+static CLOCK: LazyLock<Instant> = LazyLock::new(Instant::now);
+pub fn arrival(micros: u64) -> Instant {
+    *CLOCK + Duration::from_micros(micros)
+}
 
 pub struct Rpc {
     writer: Sender<Value>,
@@ -68,6 +73,7 @@ impl Rpc {
                     Ok(line) => match serde_json::from_str::<Value>(&line) {
                         Ok(mut frame) => {
                             frame["connectionGeneration"] = json!(generation);
+                            frame["receivedMicros"] = json!(CLOCK.elapsed().as_micros() as u64);
                             if events.send(frame).is_err() {
                                 break;
                             }
