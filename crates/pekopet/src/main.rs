@@ -319,7 +319,10 @@ impl View {
                         );
                     }
                 }
-                "show" => native::show_chat(self.chat_hwnd, true),
+                "show" => {
+                    self.tab = Tab::Chat;
+                    native::show_chat(self.chat_hwnd, true);
+                }
                 "quit" => {
                     self.rpc.take();
                     cx.quit();
