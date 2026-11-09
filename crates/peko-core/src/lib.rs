@@ -1,4 +1,5 @@
 //! Streaming avatar cues. Raw transcripts remain owned by dsh.
+pub mod text;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 

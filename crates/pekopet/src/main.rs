@@ -233,6 +233,9 @@ impl View {
         if !self.connected || self.busy {
             return;
         }
+        if self.composer.read(cx).is_composing() {
+            return;
+        }
         let text = self.composer.read(cx).content.to_string();
         if text.trim().is_empty() {
             return;

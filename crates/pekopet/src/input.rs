@@ -1,4 +1,5 @@
 // Adapted from GPUI 0.2.2 input example. Copyright Zed Industries. Apache-2.0.
+use peko_core::text::utf16_to_utf8;
 use std::ops::Range;
 
 use gpui::{
@@ -196,18 +197,7 @@ impl TextInput {
     }
 
     fn offset_from_utf16(&self, offset: usize) -> usize {
-        let mut utf8_offset = 0;
-        let mut utf16_count = 0;
-
-        for ch in self.content.chars() {
-            if utf16_count >= offset {
-                break;
-            }
-            utf16_count += ch.len_utf16();
-            utf8_offset += ch.len_utf8();
-        }
-
-        utf8_offset
+        utf16_to_utf8(&self.content, offset)
     }
 
     fn offset_to_utf16(&self, offset: usize) -> usize {
@@ -344,7 +334,9 @@ impl EntityInputHandler for TextInput {
         }
         self.selected_range = new_selected_range_utf16
             .as_ref()
-            .map(|range_utf16| self.range_from_utf16(range_utf16))
+            .map(|selected| {
+                utf16_to_utf8(new_text, selected.start)..utf16_to_utf8(new_text, selected.end)
+            })
             .map(|new_range| new_range.start + range.start..new_range.end + range.end)
             .unwrap_or_else(|| range.start + new_text.len()..range.start + new_text.len());
 
@@ -636,6 +628,9 @@ impl Focusable for TextInput {
 }
 
 impl TextInput {
+    pub fn is_composing(&self) -> bool {
+        self.marked_range.is_some()
+    }
     pub fn new(placeholder: &str, cx: &mut Context<Self>) -> Self {
         Self {
             focus_handle: cx.focus_handle(),
