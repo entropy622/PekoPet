@@ -3,7 +3,7 @@ $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 Push-Location $root
 try{
-  if(-not(Test-Path 'vendor/cubism-core/include/Live2DCubismCore.h')){throw '缺少 Cubism Core，请先执行 scripts/import-sdk.ps1。'}
+  if(-not(Test-Path 'local/cubism-core/include/Live2DCubismCore.h')){throw '缺少 Cubism Core，请先执行 scripts/import-sdk.ps1。'}
   & cargo build --release -p pekopet --locked
   if($LASTEXITCODE -ne 0){throw '原生构建失败，未创建交付包。'}
   if(-not $DestinationPath){$DestinationPath=Join-Path $root ('dist/PekoPet-'+(Get-Date -Format 'yyyyMMdd-HHmmss'))}

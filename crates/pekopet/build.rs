@@ -26,8 +26,9 @@ fn main() {
     let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("../..");
     let framework = root.join("vendor/cubism-framework/src");
     let core = root.join("vendor/cubism-core");
+    let core_include = root.join("local/cubism-core/include");
     assert!(
-        core.join("include/Live2DCubismCore.h").exists(),
+        core_include.join("Live2DCubismCore.h").exists(),
         "Cubism Core is missing. Run scripts/import-sdk.ps1 with the official Native 5-r.5 SDK directory."
     );
     let mut files = Vec::new();
@@ -58,7 +59,7 @@ fn main() {
         .define("NOMINMAX", None)
         .include(&framework)
         .include(&out)
-        .include(core.join("include"))
+        .include(&core_include)
         .include(root.join("native"));
     for file in &files {
         build.file(file);

@@ -16,6 +16,8 @@ npm ci
 
 从 Live2D 官网取得 Cubism Native 5-r.5 SDK，阅读并接受其许可，解压后导入清单允许再分发的文件。
 
+Windows 库随仓库提供。Core 头文件未列入官方再分发清单，导入器将其保存到本机 `local/cubism-core/include`，不会入库。
+
 ```powershell
 ./scripts/import-sdk.ps1 -SdkPath D:/SDK/CubismSdkForNative-5-r.5
 npm run assets

@@ -9,9 +9,11 @@ test('SDK importer accepts only files named in the redistributable manifest',t=>
   mkdirSync(join(root,'scripts'),{recursive:true});copyFileSync('scripts/import-sdk.ps1',join(root,'scripts/import-sdk.ps1'));
   const sdk=join(root,'SDK'),core=join(sdk,'Core');for(const d of ['include','lib/windows/x86_64/143'])mkdirSync(join(core,d),{recursive:true});
   writeFileSync(join(core,'include/Live2DCubismCore.h'),'fixture header');writeFileSync(join(core,'lib/windows/x86_64/143/Live2DCubismCore_MD.lib'),'fixture library');writeFileSync(join(core,'LICENSE.md'),'fixture license');
-  writeFileSync(join(core,'RedistributableFiles.txt'),'include/Live2DCubismCore.h\nlib/windows/x86_64/143/Live2DCubismCore_MD.lib\n');
+  writeFileSync(join(core,'RedistributableFiles.txt'),'The following files are redistributable:\n- lib/windows/x86_64/143/Live2DCubismCore_MD.lib\n');
   const script=join(root,'scripts/import-sdk.ps1');const invoke=()=>spawnSync('powershell.exe',['-NoProfile','-File',script,'-SdkPath',sdk],{encoding:'utf8',windowsHide:true});
-  const accepted=invoke();assert.equal(accepted.status,0,accepted.stderr);assert.equal(readFileSync(join(root,'vendor/cubism-core/include/Live2DCubismCore.h'),'utf8'),'fixture header');
+  const accepted=invoke();assert.equal(accepted.status,0,accepted.stderr);assert.equal(readFileSync(join(root,'local/cubism-core/include/Live2DCubismCore.h'),'utf8'),'fixture header');
+  assert.equal(existsSync(join(root,'vendor/cubism-core/include/Live2DCubismCore.h')),false);
+  assert.equal(readFileSync(join(root,'vendor/cubism-core/lib/Live2DCubismCore_MD.lib'),'utf8'),'fixture library');
   const root2=join(root,'second');mkdirSync(join(root2,'scripts'),{recursive:true});copyFileSync(script,join(root2,'scripts/import-sdk.ps1'));
   writeFileSync(join(core,'RedistributableFiles.txt'),'include/Live2DCubismCore.h\n');
   const denied=spawnSync('powershell.exe',['-NoProfile','-File',join(root2,'scripts/import-sdk.ps1'),'-SdkPath',sdk],{encoding:'utf8',windowsHide:true});

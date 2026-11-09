@@ -21,6 +21,19 @@ jobs:
         env:
           PEKO_TYPECHECK: '1'
         run: cargo check -p pekopet --locked
-      - name: Build native application when licensed Core is present
-        if: hashFiles('vendor/cubism-core/include/Live2DCubismCore.h') != ''
+      - name: Prepare SDK under the repository owner's license consent
+        if: github.repository == 'entropy622/PekoPet' && github.event_name != 'pull_request'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force local/sdk | Out-Null
+          Invoke-WebRequest 'https://cubism.live2d.com/sdk-native/bin/CubismSdkForNative-5-r.5.zip' -OutFile local/sdk/native.zip
+          Expand-Archive local/sdk/native.zip -DestinationPath local/sdk
+          ./scripts/import-sdk.ps1 -SdkPath local/sdk/CubismSdkForNative-5-r.5
+      - name: Build native application
+        if: github.repository == 'entropy622/PekoPet' && github.event_name != 'pull_request'
         run: cargo build -p pekopet --release --locked
+      - uses: actions/upload-artifact@v4
+        if: github.repository == 'entropy622/PekoPet' && github.event_name != 'pull_request'
+        with:
+          name: PekoPet-native-windows-x64
+          path: target/release/pekopet.exe
