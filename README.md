@@ -67,7 +67,7 @@ npm run package:windows
 
 `e2e-dsh` 可通过 `PEKO_TEST_PROVIDER` 和 `PEKO_TEST_MODEL` 指定已有测试路由，不改动 dsh 配置。
 
-公开仓库的 Windows CI 运行 Node 测试、Rust 核心测试和 GPUI 类型检查。`PEKO_TYPECHECK=1` 仅用于 `cargo check`，不生成原生程序。SDK 就位后，正常构建还会编译 C++ 桥接层和链接 Core。
+公开仓库的 Windows CI 运行 Node 测试、Rust 核心测试、GPUI 类型检查、原生 Cubism 编译与链接，并生成 Windows x64 便携包。构建产物位于成功工作流的 `PekoPet-portable-windows-x64` artifact。`PEKO_TYPECHECK=1` 仅用于 `cargo check`，不生成原生程序。
 
 ## 目录与许可
 

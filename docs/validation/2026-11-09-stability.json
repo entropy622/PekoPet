@@ -1,0 +1,1120 @@
+{
+  "candidate": "ee7ee8a",
+  "platform": "Windows x64",
+  "condition": "Idle companion with the Windows input desktop locked; no injected input or automatic restart.",
+  "result": {
+    "pid": 43460,
+    "processStart": "2026-11-09T21:30:38.3697741+08:00",
+    "started": "2026-11-09T21:31:33.9740311+08:00",
+    "finished": "2026-11-09T23:31:36.0989796+08:00",
+    "elapsedSeconds": 7202.12,
+    "samples": 120,
+    "passed": true,
+    "failure": null
+  },
+  "summary": {
+    "samples": 120,
+    "elapsedSeconds": 7142.11,
+    "cpuOneCorePercent": 6.108374789452388,
+    "workingSetMB": {
+      "min": 367.32,
+      "max": 464.56,
+      "final": 450.34
+    },
+    "privateMB": {
+      "min": 407.4,
+      "max": 407.84,
+      "final": 407.84
+    },
+    "handles": {
+      "initial": 793,
+      "final": 777
+    },
+    "threads": {
+      "initial": 104,
+      "final": 97
+    }
+  },
+  "samples": [
+    {
+      "time": "2026-11-09T21:31:33.9931962+08:00",
+      "elapsedSeconds": 0.02,
+      "cpuSeconds": 14.40625,
+      "workingSetMB": 367.32,
+      "privateMB": 407.4,
+      "handles": 793,
+      "threads": 104
+    },
+    {
+      "time": "2026-11-09T21:32:34.0271146+08:00",
+      "elapsedSeconds": 60.05,
+      "cpuSeconds": 17.921875,
+      "workingSetMB": 367.54,
+      "privateMB": 407.6,
+      "handles": 791,
+      "threads": 101
+    },
+    {
+      "time": "2026-11-09T21:33:34.0492232+08:00",
+      "elapsedSeconds": 120.08,
+      "cpuSeconds": 21.125,
+      "workingSetMB": 464.04,
+      "privateMB": 407.46,
+      "handles": 775,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T21:34:34.0664175+08:00",
+      "elapsedSeconds": 180.09,
+      "cpuSeconds": 25.484375,
+      "workingSetMB": 464.05,
+      "privateMB": 407.48,
+      "handles": 775,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T21:35:34.0804176+08:00",
+      "elapsedSeconds": 240.11,
+      "cpuSeconds": 28.875,
+      "workingSetMB": 464.16,
+      "privateMB": 407.59,
+      "handles": 775,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T21:36:34.0985067+08:00",
+      "elapsedSeconds": 300.12,
+      "cpuSeconds": 32.40625,
+      "workingSetMB": 464.43,
+      "privateMB": 407.65,
+      "handles": 783,
+      "threads": 99
+    },
+    {
+      "time": "2026-11-09T21:37:34.1188807+08:00",
+      "elapsedSeconds": 360.14,
+      "cpuSeconds": 36.109375,
+      "workingSetMB": 464.54,
+      "privateMB": 407.67,
+      "handles": 785,
+      "threads": 99
+    },
+    {
+      "time": "2026-11-09T21:38:34.1433249+08:00",
+      "elapsedSeconds": 420.17,
+      "cpuSeconds": 40.5,
+      "workingSetMB": 464.53,
+      "privateMB": 407.62,
+      "handles": 775,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T21:39:34.1674119+08:00",
+      "elapsedSeconds": 480.19,
+      "cpuSeconds": 43.875,
+      "workingSetMB": 464.53,
+      "privateMB": 407.62,
+      "handles": 775,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T21:40:34.1797572+08:00",
+      "elapsedSeconds": 540.21,
+      "cpuSeconds": 46.875,
+      "workingSetMB": 464.53,
+      "privateMB": 407.62,
+      "handles": 775,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T21:41:34.1921456+08:00",
+      "elapsedSeconds": 600.22,
+      "cpuSeconds": 50.328125,
+      "workingSetMB": 464.56,
+      "privateMB": 407.65,
+      "handles": 779,
+      "threads": 98
+    },
+    {
+      "time": "2026-11-09T21:42:34.2143503+08:00",
+      "elapsedSeconds": 660.24,
+      "cpuSeconds": 53.875,
+      "workingSetMB": 464.54,
+      "privateMB": 407.62,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T21:43:34.2286659+08:00",
+      "elapsedSeconds": 720.25,
+      "cpuSeconds": 57.765625,
+      "workingSetMB": 464.54,
+      "privateMB": 407.62,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T21:44:34.2389601+08:00",
+      "elapsedSeconds": 780.26,
+      "cpuSeconds": 61.328125,
+      "workingSetMB": 464.54,
+      "privateMB": 407.62,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T21:45:34.2567253+08:00",
+      "elapsedSeconds": 840.28,
+      "cpuSeconds": 64.765625,
+      "workingSetMB": 464.54,
+      "privateMB": 407.62,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T21:46:34.2682909+08:00",
+      "elapsedSeconds": 900.29,
+      "cpuSeconds": 68.09375,
+      "workingSetMB": 464.54,
+      "privateMB": 407.62,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T21:47:34.2860696+08:00",
+      "elapsedSeconds": 960.31,
+      "cpuSeconds": 72.59375,
+      "workingSetMB": 464.56,
+      "privateMB": 407.64,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T21:48:34.3022792+08:00",
+      "elapsedSeconds": 1020.33,
+      "cpuSeconds": 75.984375,
+      "workingSetMB": 464.56,
+      "privateMB": 407.64,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T21:49:34.3220047+08:00",
+      "elapsedSeconds": 1080.35,
+      "cpuSeconds": 79.859375,
+      "workingSetMB": 464.56,
+      "privateMB": 407.64,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T21:50:34.3437407+08:00",
+      "elapsedSeconds": 1140.37,
+      "cpuSeconds": 82.84375,
+      "workingSetMB": 463.37,
+      "privateMB": 407.64,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T21:51:34.3606970+08:00",
+      "elapsedSeconds": 1200.39,
+      "cpuSeconds": 87.328125,
+      "workingSetMB": 463.37,
+      "privateMB": 407.64,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T21:52:34.3727005+08:00",
+      "elapsedSeconds": 1260.4,
+      "cpuSeconds": 90.65625,
+      "workingSetMB": 463.37,
+      "privateMB": 407.64,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T21:53:34.3818760+08:00",
+      "elapsedSeconds": 1320.41,
+      "cpuSeconds": 94.125,
+      "workingSetMB": 463.37,
+      "privateMB": 407.64,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T21:54:34.3923068+08:00",
+      "elapsedSeconds": 1380.42,
+      "cpuSeconds": 97,
+      "workingSetMB": 463.37,
+      "privateMB": 407.64,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T21:55:34.4052014+08:00",
+      "elapsedSeconds": 1440.43,
+      "cpuSeconds": 100.96875,
+      "workingSetMB": 463.37,
+      "privateMB": 407.64,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T21:56:34.4221452+08:00",
+      "elapsedSeconds": 1500.45,
+      "cpuSeconds": 105.0625,
+      "workingSetMB": 463.37,
+      "privateMB": 407.64,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T21:57:34.4329650+08:00",
+      "elapsedSeconds": 1560.46,
+      "cpuSeconds": 108.21875,
+      "workingSetMB": 463.37,
+      "privateMB": 407.64,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T21:58:34.4489648+08:00",
+      "elapsedSeconds": 1620.47,
+      "cpuSeconds": 111.625,
+      "workingSetMB": 463.37,
+      "privateMB": 407.64,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T21:59:34.4794670+08:00",
+      "elapsedSeconds": 1680.51,
+      "cpuSeconds": 114.734375,
+      "workingSetMB": 463.5,
+      "privateMB": 407.77,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:00:34.4992805+08:00",
+      "elapsedSeconds": 1740.53,
+      "cpuSeconds": 119.421875,
+      "workingSetMB": 463.5,
+      "privateMB": 407.77,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:01:34.5207678+08:00",
+      "elapsedSeconds": 1800.55,
+      "cpuSeconds": 123.046875,
+      "workingSetMB": 463.5,
+      "privateMB": 407.77,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:02:34.5313851+08:00",
+      "elapsedSeconds": 1860.56,
+      "cpuSeconds": 126.28125,
+      "workingSetMB": 463.5,
+      "privateMB": 407.77,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:03:34.5488452+08:00",
+      "elapsedSeconds": 1920.57,
+      "cpuSeconds": 130.328125,
+      "workingSetMB": 463.5,
+      "privateMB": 407.77,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:04:34.5738972+08:00",
+      "elapsedSeconds": 1980.6,
+      "cpuSeconds": 134.203125,
+      "workingSetMB": 463.5,
+      "privateMB": 407.77,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:05:34.5912641+08:00",
+      "elapsedSeconds": 2040.62,
+      "cpuSeconds": 137.890625,
+      "workingSetMB": 463.5,
+      "privateMB": 407.77,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:06:34.6051142+08:00",
+      "elapsedSeconds": 2100.63,
+      "cpuSeconds": 141.109375,
+      "workingSetMB": 463.5,
+      "privateMB": 407.77,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:07:34.6210388+08:00",
+      "elapsedSeconds": 2160.65,
+      "cpuSeconds": 144.40625,
+      "workingSetMB": 463.5,
+      "privateMB": 407.77,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:08:34.6348035+08:00",
+      "elapsedSeconds": 2220.66,
+      "cpuSeconds": 147.390625,
+      "workingSetMB": 463.53,
+      "privateMB": 407.8,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:09:34.6464714+08:00",
+      "elapsedSeconds": 2280.67,
+      "cpuSeconds": 151.671875,
+      "workingSetMB": 463.53,
+      "privateMB": 407.8,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:10:34.6659234+08:00",
+      "elapsedSeconds": 2340.69,
+      "cpuSeconds": 154.984375,
+      "workingSetMB": 463.54,
+      "privateMB": 407.8,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:11:34.6841501+08:00",
+      "elapsedSeconds": 2400.71,
+      "cpuSeconds": 158.5625,
+      "workingSetMB": 463.54,
+      "privateMB": 407.8,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:12:34.7020737+08:00",
+      "elapsedSeconds": 2460.73,
+      "cpuSeconds": 162.046875,
+      "workingSetMB": 463.54,
+      "privateMB": 407.8,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:13:34.7203755+08:00",
+      "elapsedSeconds": 2520.75,
+      "cpuSeconds": 166.78125,
+      "workingSetMB": 463.54,
+      "privateMB": 407.81,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:14:34.7321690+08:00",
+      "elapsedSeconds": 2580.76,
+      "cpuSeconds": 170.421875,
+      "workingSetMB": 463.54,
+      "privateMB": 407.81,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:15:34.7566705+08:00",
+      "elapsedSeconds": 2640.78,
+      "cpuSeconds": 173.9375,
+      "workingSetMB": 463.54,
+      "privateMB": 407.81,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:16:34.7681639+08:00",
+      "elapsedSeconds": 2700.79,
+      "cpuSeconds": 177.28125,
+      "workingSetMB": 463.54,
+      "privateMB": 407.81,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:17:34.7771664+08:00",
+      "elapsedSeconds": 2760.8,
+      "cpuSeconds": 181.8125,
+      "workingSetMB": 463.54,
+      "privateMB": 407.81,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:18:34.7935758+08:00",
+      "elapsedSeconds": 2820.82,
+      "cpuSeconds": 185.0625,
+      "workingSetMB": 463.54,
+      "privateMB": 407.81,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:19:34.8164216+08:00",
+      "elapsedSeconds": 2880.84,
+      "cpuSeconds": 188.765625,
+      "workingSetMB": 463.54,
+      "privateMB": 407.81,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:20:34.8323451+08:00",
+      "elapsedSeconds": 2940.86,
+      "cpuSeconds": 192.328125,
+      "workingSetMB": 463.54,
+      "privateMB": 407.81,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:21:34.8444389+08:00",
+      "elapsedSeconds": 3000.87,
+      "cpuSeconds": 195.9375,
+      "workingSetMB": 463.54,
+      "privateMB": 407.81,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:22:34.8631589+08:00",
+      "elapsedSeconds": 3060.89,
+      "cpuSeconds": 200.140625,
+      "workingSetMB": 463.54,
+      "privateMB": 407.81,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:23:34.8746799+08:00",
+      "elapsedSeconds": 3120.9,
+      "cpuSeconds": 203.40625,
+      "workingSetMB": 463.54,
+      "privateMB": 407.81,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:24:34.8980990+08:00",
+      "elapsedSeconds": 3180.92,
+      "cpuSeconds": 206.5625,
+      "workingSetMB": 463.54,
+      "privateMB": 407.81,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:25:34.9114728+08:00",
+      "elapsedSeconds": 3240.94,
+      "cpuSeconds": 210.15625,
+      "workingSetMB": 463.54,
+      "privateMB": 407.81,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:26:34.9256025+08:00",
+      "elapsedSeconds": 3300.95,
+      "cpuSeconds": 214.421875,
+      "workingSetMB": 463.54,
+      "privateMB": 407.81,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:27:34.9380990+08:00",
+      "elapsedSeconds": 3360.96,
+      "cpuSeconds": 217.6875,
+      "workingSetMB": 463.54,
+      "privateMB": 407.81,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:28:34.9597758+08:00",
+      "elapsedSeconds": 3420.99,
+      "cpuSeconds": 220.75,
+      "workingSetMB": 463.54,
+      "privateMB": 407.81,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:29:34.9814044+08:00",
+      "elapsedSeconds": 3481.01,
+      "cpuSeconds": 224.078125,
+      "workingSetMB": 463.54,
+      "privateMB": 407.81,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:30:34.9989380+08:00",
+      "elapsedSeconds": 3541.02,
+      "cpuSeconds": 228.421875,
+      "workingSetMB": 463.54,
+      "privateMB": 407.81,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:31:35.0108961+08:00",
+      "elapsedSeconds": 3601.04,
+      "cpuSeconds": 232.140625,
+      "workingSetMB": 463.54,
+      "privateMB": 407.81,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:32:35.0205539+08:00",
+      "elapsedSeconds": 3661.05,
+      "cpuSeconds": 235.5625,
+      "workingSetMB": 463.54,
+      "privateMB": 407.81,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:33:35.0417869+08:00",
+      "elapsedSeconds": 3721.07,
+      "cpuSeconds": 239.046875,
+      "workingSetMB": 463.54,
+      "privateMB": 407.81,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:34:35.0621173+08:00",
+      "elapsedSeconds": 3781.09,
+      "cpuSeconds": 242.375,
+      "workingSetMB": 463.54,
+      "privateMB": 407.81,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:35:35.0714829+08:00",
+      "elapsedSeconds": 3841.1,
+      "cpuSeconds": 247.25,
+      "workingSetMB": 463.54,
+      "privateMB": 407.81,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:36:35.0795177+08:00",
+      "elapsedSeconds": 3901.11,
+      "cpuSeconds": 250.96875,
+      "workingSetMB": 463.55,
+      "privateMB": 407.82,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:37:35.1002089+08:00",
+      "elapsedSeconds": 3961.13,
+      "cpuSeconds": 254.328125,
+      "workingSetMB": 463.55,
+      "privateMB": 407.82,
+      "handles": 776,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:38:35.1144140+08:00",
+      "elapsedSeconds": 4021.14,
+      "cpuSeconds": 257.4375,
+      "workingSetMB": 463.55,
+      "privateMB": 407.82,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:39:35.1229778+08:00",
+      "elapsedSeconds": 4081.15,
+      "cpuSeconds": 262.21875,
+      "workingSetMB": 463.55,
+      "privateMB": 407.82,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:40:35.1460888+08:00",
+      "elapsedSeconds": 4141.17,
+      "cpuSeconds": 265.15625,
+      "workingSetMB": 463.55,
+      "privateMB": 407.82,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:41:35.1575492+08:00",
+      "elapsedSeconds": 4201.18,
+      "cpuSeconds": 268.71875,
+      "workingSetMB": 463.55,
+      "privateMB": 407.82,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:42:35.1693491+08:00",
+      "elapsedSeconds": 4261.2,
+      "cpuSeconds": 271.921875,
+      "workingSetMB": 463.55,
+      "privateMB": 407.82,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:43:35.1919285+08:00",
+      "elapsedSeconds": 4321.22,
+      "cpuSeconds": 275.828125,
+      "workingSetMB": 463.55,
+      "privateMB": 407.82,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:44:35.2004919+08:00",
+      "elapsedSeconds": 4381.23,
+      "cpuSeconds": 279.234375,
+      "workingSetMB": 463.55,
+      "privateMB": 407.82,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:45:35.2186002+08:00",
+      "elapsedSeconds": 4441.24,
+      "cpuSeconds": 282.4375,
+      "workingSetMB": 463.55,
+      "privateMB": 407.82,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:46:35.2424458+08:00",
+      "elapsedSeconds": 4501.27,
+      "cpuSeconds": 285.828125,
+      "workingSetMB": 463.55,
+      "privateMB": 407.82,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:47:35.2608340+08:00",
+      "elapsedSeconds": 4561.29,
+      "cpuSeconds": 289.40625,
+      "workingSetMB": 463.55,
+      "privateMB": 407.82,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:48:35.2775566+08:00",
+      "elapsedSeconds": 4621.3,
+      "cpuSeconds": 293.484375,
+      "workingSetMB": 463.55,
+      "privateMB": 407.82,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:49:35.2988783+08:00",
+      "elapsedSeconds": 4681.32,
+      "cpuSeconds": 296.78125,
+      "workingSetMB": 463.55,
+      "privateMB": 407.82,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:50:35.3151969+08:00",
+      "elapsedSeconds": 4741.34,
+      "cpuSeconds": 300.6875,
+      "workingSetMB": 463.55,
+      "privateMB": 407.82,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:51:35.3276763+08:00",
+      "elapsedSeconds": 4801.35,
+      "cpuSeconds": 304.21875,
+      "workingSetMB": 463.55,
+      "privateMB": 407.82,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:52:35.3560421+08:00",
+      "elapsedSeconds": 4861.38,
+      "cpuSeconds": 308.5,
+      "workingSetMB": 463.55,
+      "privateMB": 407.82,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:53:35.3673768+08:00",
+      "elapsedSeconds": 4921.39,
+      "cpuSeconds": 312.1875,
+      "workingSetMB": 463.57,
+      "privateMB": 407.84,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:54:35.3819417+08:00",
+      "elapsedSeconds": 4981.41,
+      "cpuSeconds": 315.703125,
+      "workingSetMB": 463.57,
+      "privateMB": 407.84,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:55:35.4033301+08:00",
+      "elapsedSeconds": 5041.43,
+      "cpuSeconds": 319.046875,
+      "workingSetMB": 463.57,
+      "privateMB": 407.84,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:56:35.4262756+08:00",
+      "elapsedSeconds": 5101.45,
+      "cpuSeconds": 323.453125,
+      "workingSetMB": 463.57,
+      "privateMB": 407.84,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:57:35.4494832+08:00",
+      "elapsedSeconds": 5161.48,
+      "cpuSeconds": 327.21875,
+      "workingSetMB": 463.57,
+      "privateMB": 407.84,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:58:35.4605083+08:00",
+      "elapsedSeconds": 5221.49,
+      "cpuSeconds": 330.78125,
+      "workingSetMB": 463.57,
+      "privateMB": 407.84,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T22:59:35.4779152+08:00",
+      "elapsedSeconds": 5281.5,
+      "cpuSeconds": 334.140625,
+      "workingSetMB": 463.57,
+      "privateMB": 407.84,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T23:00:35.5019202+08:00",
+      "elapsedSeconds": 5341.53,
+      "cpuSeconds": 337.8125,
+      "workingSetMB": 463.57,
+      "privateMB": 407.84,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T23:01:35.5258572+08:00",
+      "elapsedSeconds": 5401.55,
+      "cpuSeconds": 342.546875,
+      "workingSetMB": 463.57,
+      "privateMB": 407.84,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T23:02:35.5382270+08:00",
+      "elapsedSeconds": 5461.56,
+      "cpuSeconds": 346.171875,
+      "workingSetMB": 463.57,
+      "privateMB": 407.84,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T23:03:35.5468929+08:00",
+      "elapsedSeconds": 5521.57,
+      "cpuSeconds": 349.875,
+      "workingSetMB": 463.57,
+      "privateMB": 407.84,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T23:04:35.5574848+08:00",
+      "elapsedSeconds": 5581.58,
+      "cpuSeconds": 352.9375,
+      "workingSetMB": 463.57,
+      "privateMB": 407.84,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T23:05:35.5675624+08:00",
+      "elapsedSeconds": 5641.59,
+      "cpuSeconds": 357.3125,
+      "workingSetMB": 463.57,
+      "privateMB": 407.84,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T23:06:35.5883064+08:00",
+      "elapsedSeconds": 5701.61,
+      "cpuSeconds": 361.3125,
+      "workingSetMB": 463.57,
+      "privateMB": 407.84,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T23:07:35.6103061+08:00",
+      "elapsedSeconds": 5761.64,
+      "cpuSeconds": 364.671875,
+      "workingSetMB": 463.57,
+      "privateMB": 407.84,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T23:08:35.6331117+08:00",
+      "elapsedSeconds": 5821.66,
+      "cpuSeconds": 368.265625,
+      "workingSetMB": 463.57,
+      "privateMB": 407.84,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T23:09:35.6685597+08:00",
+      "elapsedSeconds": 5881.69,
+      "cpuSeconds": 372.625,
+      "workingSetMB": 463.57,
+      "privateMB": 407.84,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T23:10:35.6895635+08:00",
+      "elapsedSeconds": 5941.72,
+      "cpuSeconds": 376.484375,
+      "workingSetMB": 463.57,
+      "privateMB": 407.84,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T23:11:35.7067432+08:00",
+      "elapsedSeconds": 6001.73,
+      "cpuSeconds": 379.796875,
+      "workingSetMB": 463.57,
+      "privateMB": 407.84,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T23:12:35.7213420+08:00",
+      "elapsedSeconds": 6061.75,
+      "cpuSeconds": 383.296875,
+      "workingSetMB": 463.57,
+      "privateMB": 407.84,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T23:13:35.7303206+08:00",
+      "elapsedSeconds": 6121.76,
+      "cpuSeconds": 386.671875,
+      "workingSetMB": 463.57,
+      "privateMB": 407.84,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T23:14:35.7531219+08:00",
+      "elapsedSeconds": 6181.78,
+      "cpuSeconds": 390.734375,
+      "workingSetMB": 463.57,
+      "privateMB": 407.84,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T23:15:35.7635016+08:00",
+      "elapsedSeconds": 6241.79,
+      "cpuSeconds": 394.265625,
+      "workingSetMB": 463.57,
+      "privateMB": 407.84,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T23:16:35.7770505+08:00",
+      "elapsedSeconds": 6301.8,
+      "cpuSeconds": 397.546875,
+      "workingSetMB": 463.57,
+      "privateMB": 407.84,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T23:17:35.7985754+08:00",
+      "elapsedSeconds": 6361.82,
+      "cpuSeconds": 400.84375,
+      "workingSetMB": 463.57,
+      "privateMB": 407.84,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T23:18:35.8127057+08:00",
+      "elapsedSeconds": 6421.84,
+      "cpuSeconds": 405.390625,
+      "workingSetMB": 463.57,
+      "privateMB": 407.84,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T23:19:35.8340867+08:00",
+      "elapsedSeconds": 6481.86,
+      "cpuSeconds": 408.859375,
+      "workingSetMB": 463.57,
+      "privateMB": 407.84,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T23:20:35.8494664+08:00",
+      "elapsedSeconds": 6541.88,
+      "cpuSeconds": 412.515625,
+      "workingSetMB": 463.57,
+      "privateMB": 407.84,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T23:21:35.8696860+08:00",
+      "elapsedSeconds": 6601.9,
+      "cpuSeconds": 415.90625,
+      "workingSetMB": 463.57,
+      "privateMB": 407.84,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T23:22:35.8913659+08:00",
+      "elapsedSeconds": 6661.92,
+      "cpuSeconds": 420.265625,
+      "workingSetMB": 463.57,
+      "privateMB": 407.84,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T23:23:35.9056716+08:00",
+      "elapsedSeconds": 6721.93,
+      "cpuSeconds": 424.671875,
+      "workingSetMB": 463.57,
+      "privateMB": 407.84,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T23:24:35.9204433+08:00",
+      "elapsedSeconds": 6781.95,
+      "cpuSeconds": 428.15625,
+      "workingSetMB": 463.57,
+      "privateMB": 407.84,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T23:25:35.9428498+08:00",
+      "elapsedSeconds": 6841.97,
+      "cpuSeconds": 431.4375,
+      "workingSetMB": 463.57,
+      "privateMB": 407.84,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T23:26:35.9641718+08:00",
+      "elapsedSeconds": 6901.99,
+      "cpuSeconds": 435.171875,
+      "workingSetMB": 463.57,
+      "privateMB": 407.84,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T23:27:35.9782679+08:00",
+      "elapsedSeconds": 6962,
+      "cpuSeconds": 439.6875,
+      "workingSetMB": 463.57,
+      "privateMB": 407.84,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T23:28:36.0031693+08:00",
+      "elapsedSeconds": 7022.03,
+      "cpuSeconds": 443.0625,
+      "workingSetMB": 450.34,
+      "privateMB": 407.84,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T23:29:36.0759857+08:00",
+      "elapsedSeconds": 7082.1,
+      "cpuSeconds": 446.765625,
+      "workingSetMB": 450.34,
+      "privateMB": 407.84,
+      "handles": 777,
+      "threads": 97
+    },
+    {
+      "time": "2026-11-09T23:30:36.0882825+08:00",
+      "elapsedSeconds": 7142.11,
+      "cpuSeconds": 450.671875,
+      "workingSetMB": 450.34,
+      "privateMB": 407.84,
+      "handles": 777,
+      "threads": 97
+    }
+  ]
+}
