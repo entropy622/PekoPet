@@ -175,7 +175,7 @@ struct Pet{
         model->update(std::min(dt,0.1f),gx,gy);
         const float clear[4]={0,0,0,0};context->ClearRenderTargetView(target.Get(),clear);auto rtv=target.Get();context->OMSetRenderTargets(1,&rtv,nullptr);
         D3D11_VIEWPORT vp{0,0,(float)state.width,(float)state.height,0,1};context->RSSetViewports(1,&vp);
-        auto renderer=model->GetRenderer<CubismRenderer_D3D11>();renderer->StartFrame(context.Get());renderer->SetDefaultRenderState(state.width,state.height);
+        auto renderer=model->GetRenderer<CubismRenderer_D3D11>();renderer->StartFrame(context.Get());
         model->GetModelMatrix()->SetHeight(1.85f*state.scale);model->GetModelMatrix()->SetCenterPosition(0,0);
         CubismMatrix44 projection;projection.Scale((float)state.height/state.width,1);projection.MultiplyByMatrix(model->GetModelMatrix());renderer->SetMvpMatrix(&projection);renderer->IsPremultipliedAlpha(false);renderer->DrawModel();renderer->EndFrame();check(swap->Present(1,0),"Present");
     }

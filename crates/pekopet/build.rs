@@ -57,6 +57,8 @@ fn main() {
         .flag("/utf-8")
         .flag("/EHsc")
         .define("NOMINMAX", None)
+        .define("UNICODE", None)
+        .define("_UNICODE", None)
         .include(&framework)
         .include(&out)
         .include(&core_include)
