@@ -19,6 +19,7 @@ try{
   Copy-Item -LiteralPath $node -Destination (Join-Path $destination 'node.exe')
   $nodeLicense=Join-Path (Split-Path $node -Parent) 'LICENSE'
   if(Test-Path $nodeLicense){Copy-Item -LiteralPath $nodeLicense -Destination (Join-Path $destination 'LICENSE-NODE')}
+  else {& $node --license|Set-Content -Encoding utf8 (Join-Path $destination 'LICENSE-NODE');if($LASTEXITCODE -ne 0){throw '读取 Node 许可失败。'}}
   Copy-Item -LiteralPath 'scripts/PekoPet.cmd' -Destination (Join-Path $destination 'PekoPet.cmd')
   $licenses=Join-Path $destination 'licenses'
   New-Item -ItemType Directory -Force $licenses|Out-Null

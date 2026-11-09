@@ -59,10 +59,13 @@ npm test
 cargo test -p peko-core --locked
 node scripts/smoke-dsh.mjs
 node scripts/e2e-dsh.mjs
+node scripts/e2e-work.mjs
 npm run package:windows
 ```
 
 `npm test` 中的 bridge 用例使用本地脚本模型，经过真实 dsh loop，不需要 API Key。`smoke-dsh` 检查当前共享配置的连接与关闭；`e2e-dsh` 使用当前真实模型，会消耗少量额度。原生 UI 的显示、模型效果与长时间运行验收见 [验收记录](docs/ACCEPTANCE.md)。
+
+`e2e-dsh` 可通过 `PEKO_TEST_PROVIDER` 和 `PEKO_TEST_MODEL` 指定已有测试路由，不改动 dsh 配置。
 
 公开仓库的 Windows CI 运行 Node 测试、Rust 核心测试和 GPUI 类型检查。`PEKO_TYPECHECK=1` 仅用于 `cargo check`，不生成原生程序。SDK 就位后，正常构建还会编译 C++ 桥接层和链接 Core。
 

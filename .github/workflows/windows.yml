@@ -15,6 +15,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm rebuild @deepseek-ai/dsh-subprocess-local koffi node-pty protobufjs
       - run: npm test
       - run: cargo test -p peko-core --locked
       - name: Type-check GPUI client
@@ -29,11 +30,11 @@ jobs:
           Invoke-WebRequest 'https://cubism.live2d.com/sdk-native/bin/CubismSdkForNative-5-r.5.zip' -OutFile local/sdk/native.zip
           Expand-Archive local/sdk/native.zip -DestinationPath local/sdk
           ./scripts/import-sdk.ps1 -SdkPath local/sdk/CubismSdkForNative-5-r.5
-      - name: Build native application
+      - name: Build native portable candidate
         if: github.repository == 'entropy622/PekoPet' && github.event_name != 'pull_request'
-        run: cargo build -p pekopet --release --locked
+        run: npm run package:windows -- -DestinationPath dist/PekoPet-windows-x64
       - uses: actions/upload-artifact@v4
         if: github.repository == 'entropy622/PekoPet' && github.event_name != 'pull_request'
         with:
-          name: PekoPet-native-windows-x64
-          path: target/release/pekopet.exe
+          name: PekoPet-portable-windows-x64
+          path: dist/PekoPet-windows-x64.zip

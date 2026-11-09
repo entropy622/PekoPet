@@ -139,8 +139,8 @@ export function apply(ctx) {
     if(method==='peko.capabilities')return caps(p);
     if(method==='initialize') {
       await ctx.get('loader')?.await();
-      route={provider:requiredString(p,'provider'),model:requiredString(p,'model')};
-      state.updateSettings(route);return sdk.initialize(p);
+      const selection={provider:requiredString(p,'provider'),model:requiredString(p,'model')};
+      const initialized=await sdk.initialize(p);route=selection;return initialized;
     }
     if(method==='session/prompt')return prompt(p);
     if(method==='session/resume') {own(requiredString(p,'sessionId'));return sdk.resume(p);}

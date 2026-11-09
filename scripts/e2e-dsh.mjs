@@ -21,7 +21,7 @@ createInterface({input:child.stdout}).on('line',line=>{
 try{
   const caps=await call('peko.capabilities',{});
   originalSettings=caps.settings;
-  const choice=caps.defaultModel;
+  const choice=process.env.PEKO_TEST_PROVIDER?{provider:process.env.PEKO_TEST_PROVIDER,model:process.env.PEKO_TEST_MODEL}:caps.defaultModel;
   if(!choice?.provider||!choice?.model)throw new Error('dsh desktop 没有默认模型');
   await call('initialize',{cwd,provider:choice.provider,model:choice.model,maxTokens:512});
   await call('peko.settings',{patch:{memoryEnabled:false,proactive:false}});

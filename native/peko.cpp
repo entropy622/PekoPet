@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <malloc.h>
 #include "peko_shaders.h"
 #include <CubismFramework.hpp>
 #include <ICubismAllocator.hpp>

@@ -454,6 +454,27 @@ impl View {
                         {
                             Ok(true) => {
                                 let c = &f["chunk"];
+                                let token = match c["type"].as_str().unwrap_or("") {
+                                    "text-delta" | "reasoning-delta" => {
+                                        c["text"].as_str().is_some_and(|s| !s.is_empty())
+                                    }
+                                    "tool-call-delta" => {
+                                        c["name"].is_string()
+                                            || c["argumentsDelta"]
+                                                .as_str()
+                                                .is_some_and(|s| !s.is_empty())
+                                    }
+                                    _ => false,
+                                };
+                                if token && self.first_token_ms.is_none() {
+                                    self.first_token_ms = self.sent_at.map(|sent| {
+                                        received_at
+                                            .unwrap_or_else(Instant::now)
+                                            .saturating_duration_since(sent)
+                                            .as_secs_f64()
+                                            * 1000.
+                                    });
+                                }
                                 match c["type"].as_str().unwrap_or("") {
                                     "text-delta" => {
                                         let out = self

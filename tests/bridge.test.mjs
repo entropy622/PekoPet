@@ -22,6 +22,7 @@ test('real dsh loop shares MCP and skills, streams, remembers, approves, asks an
   async function until(predicate){for(let i=0;i<400;i++){const e=events.find(predicate);if(e)return e;if(child.exitCode!==null)throw new Error(stderr);await new Promise(r=>setTimeout(r,25));}throw new Error(`event timeout\n${stderr}`);}
   const caps=await call('peko.capabilities');assert.equal(caps.sharedProfile,'desktop');assert.ok(caps.providers.some(p=>p.id==='peko-test'));
   await call('initialize',{cwd:home,provider:'peko-test',model:'replay'});
+  assert.equal((await call('peko.settings')).provider,'');
   const project=join(home,'project');mkdirSync(project);
   await call('session/working-directory/set',{sessionId:'root',path:project});
   await call('session/prompt',{sessionId:'root',contentBlocks:[{type:'text',text:'我喜欢兔子'}],avatar:{name:'Yumi',expressions:['星星眼'],layers:[],motions:[],parameters:[]}});
