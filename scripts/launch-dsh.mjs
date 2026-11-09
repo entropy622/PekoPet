@@ -10,6 +10,6 @@ const require=createRequire(import.meta.url);
 const cli=resolve(dirname(require.resolve('@deepseek-ai/dsh/package.json')),'lib/bin.js');
 const overlay=prepareOverlay(root);
 prepareSharedProfile(process.env.DSH_HOME||resolve(homedir(),'.dsh'));
-const child=spawn(process.execPath,['--import',pathToFileURL(resolve(root,'scripts/stdio.mjs')).href,cli,'--profile','peko','--patch',overlay],{stdio:'inherit',windowsHide:true,env:process.env});
+const child=spawn(process.execPath,['--import',pathToFileURL(resolve(root,'scripts/stdio.mjs')).href,cli,'--profile','peko','--patch',overlay,...process.argv.slice(2)],{stdio:'inherit',windowsHide:true,env:process.env});
 child.once('error',e=>{console.error('dsh 启动失败:',e.message);process.exitCode=1;});
 child.once('exit',code=>{process.exitCode=code??1;});

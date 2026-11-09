@@ -70,6 +70,11 @@ struct View {
     latencies: Vec<f64>,
     sent_at: Option<Instant>,
     first_token_ms: Option<f64>,
+    generation: u64,
+    question_inputs: HashMap<String, Entity<TextInput>>,
+    question_choices: HashMap<String, Vec<String>>,
+    debug_parameters: BTreeMap<String, f32>,
+    clear_memory_armed: bool,
 }
 fn button(id: impl Into<SharedString>, text: impl Into<SharedString>) -> Stateful<Div> {
     div()
@@ -127,6 +132,11 @@ impl View {
             latencies: Vec::new(),
             sent_at: None,
             first_token_ms: None,
+            generation: 0,
+            question_inputs: HashMap::new(),
+            question_choices: HashMap::new(),
+            debug_parameters: BTreeMap::new(),
+            clear_memory_armed: false,
         };
         this.connect();
         cx.spawn(async move |weak, cx| {
@@ -148,13 +158,14 @@ impl View {
         this
     }
     fn connect(&mut self) {
+        self.generation += 1;
         self.rpc.take();
         self.connected = false;
         self.busy = false;
         self.pending.clear();
         self.approvals.clear();
         self.error.clear();
-        match rpc::Rpc::start(self.root.clone(), self.tx.clone()) {
+        match rpc::Rpc::start(self.root.clone(), self.tx.clone(), self.generation) {
             Ok(rpc) => {
                 self.rpc = Some(rpc);
                 self.call("peko.capabilities", json!({}), Reply::Capabilities);
@@ -188,7 +199,7 @@ impl View {
     }
     fn native_command(&self, command: Command) {
         if let Some(p) = &self.native {
-            let _ = p.tx.send(command);
+            let _ = p.tx.send((command, Instant::now()));
         }
     }
     fn send(&mut self, _: &SendMessage, _: &mut Window, cx: &mut Context<Self>) {
@@ -250,6 +261,12 @@ impl View {
         cx.notify();
     }
     fn event(&mut self, e: Value, cx: &mut Context<Self>) {
+        if e["connectionGeneration"]
+            .as_u64()
+            .is_some_and(|g| g != self.generation)
+        {
+            return;
+        }
         if let Some(kind) = e["native"].as_str() {
             match kind {
                 "catalog" => {
@@ -268,6 +285,11 @@ impl View {
                     cx.quit();
                 }
                 "settings" => self.save(e["patch"].clone()),
+                "state" => self.call(
+                    "peko.avatar",
+                    json!({"sessionId":self.session,"state":e["state"]}),
+                    Reply::Ordinary,
+                ),
                 "latency" => {
                     if let Some(ms) = e["ms"].as_f64() {
                         self.latencies.push(ms);
@@ -318,7 +340,7 @@ impl View {
                     });
                     if self.native.is_none() {
                         self.native = Some(Native::start(
-                            native::default_model(),
+                            native::model_path(self.settings["avatar"].as_str().unwrap_or("yumi")),
                             self.settings.clone(),
                             self.tx.clone(),
                         ));
@@ -329,6 +351,18 @@ impl View {
                     self.connected = true;
                     self.status = "在你身边".into();
                     self.call("peko.memory", json!({}), Reply::Memories);
+                    if self.sessions.iter().any(|s| s["id"] == self.session) {
+                        self.call(
+                            "peko.open",
+                            json!({"sessionId":self.session}),
+                            Reply::Ordinary,
+                        );
+                        self.call(
+                            "peko.history",
+                            json!({"sessionId":self.session}),
+                            Reply::History,
+                        );
+                    }
                 }
                 Reply::Settings => {
                     self.settings = r.clone();
@@ -350,6 +384,9 @@ impl View {
                             text: visible_text(m["text"].as_str().unwrap_or("")),
                         })
                         .collect();
+                    if let Ok(cue) = serde_json::from_value::<Cue>(r["avatarState"].clone()) {
+                        self.native_command(Command::Cue(cue));
+                    }
                 }
                 Reply::Ordinary => {}
             }
@@ -450,6 +487,17 @@ impl View {
                 }
             }
             "peko.approval" => {
+                if let Some(questions) = p["questions"].as_array() {
+                    for q in questions {
+                        let key = format!(
+                            "{}/{}",
+                            p["id"].as_str().unwrap_or(""),
+                            q["id"].as_str().unwrap_or("")
+                        );
+                        self.question_inputs
+                            .insert(key, cx.new(|cx| TextInput::new("也可以填写自己的回答", cx)));
+                    }
+                }
                 self.approvals.push(p.clone());
                 self.status = "等你决定".into();
                 native::show_chat(self.chat_hwnd, true);
@@ -554,7 +602,7 @@ impl Render for View {
                     if !this.busy && this.session != id {
                         this.session = id.clone();
                         this.cwd = cwd.clone();
-                        this.call("session/resume", json!({"sessionId":id}), Reply::Ordinary);
+                        this.call("peko.open", json!({"sessionId":id}), Reply::Ordinary);
                         this.call("peko.history", json!({"sessionId":id}), Reply::History);
                         this.tab = Tab::Chat;
                     }
@@ -683,22 +731,78 @@ impl Render for View {
                         );
                     } else {
                         for q in a["questions"].as_array().unwrap_or(&Vec::new()) {
+                            let question = q["id"].as_str().unwrap_or("").to_string();
+                            let key = format!("{id}/{question}");
+                            let multi = q["multiSelect"].as_bool().unwrap_or(false);
                             card = card.child(q["question"].as_str().unwrap_or("").to_string());
+                            if let Some(detail) = q["detail"].as_str() {
+                                card = card.child(div().text_sm().child(detail.to_string()));
+                            }
                             for o in q["options"].as_array().unwrap_or(&Vec::new()) {
                                 let label = o["label"].as_str().unwrap_or("").to_string();
-                                let question = q["id"].as_str().unwrap_or("").to_string();
-                                let id = id.clone();
+                                let key = key.clone();
+                                let selected = self
+                                    .question_choices
+                                    .get(&key)
+                                    .is_some_and(|v| v.contains(&label));
                                 card = card.child(
-                                    button(format!("{id}{question}{label}"), label.clone())
-                                        .on_click(cx.listener(move |this, _, _, _| {
-                                            this.answer(
-                                            &id,
-                                            json!({"answers":[{"id":question,"selected":[label]}]}),
-                                        )
+                                    button(format!("{key}/{label}"), label.clone())
+                                        .when(selected, |s| s.bg(rgb(0x526e62)))
+                                        .on_click(cx.listener(move |this, _, _, cx| {
+                                            let choices = this
+                                                .question_choices
+                                                .entry(key.clone())
+                                                .or_default();
+                                            if multi {
+                                                if let Some(i) =
+                                                    choices.iter().position(|s| s == &label)
+                                                {
+                                                    choices.remove(i);
+                                                } else {
+                                                    choices.push(label.clone());
+                                                }
+                                            } else {
+                                                *choices = vec![label.clone()];
+                                            }
+                                            cx.notify();
                                         })),
                                 );
                             }
+                            if let Some(input) = self.question_inputs.get(&key) {
+                                card = card.child(input.clone());
+                            }
                         }
+                        let questions = a["questions"].as_array().cloned().unwrap_or_default();
+                        let id = id.clone();
+                        card =
+                            card.child(button(format!("submit{id}"), "提交回答").mt_2().on_click(
+                                cx.listener(move |this, _, _, cx| {
+                                    let mut answers = Vec::new();
+                                    for q in &questions {
+                                        let qid = q["id"].as_str().unwrap_or("");
+                                        let key = format!("{id}/{qid}");
+                                        let selected = this
+                                            .question_choices
+                                            .get(&key)
+                                            .cloned()
+                                            .unwrap_or_default();
+                                        let custom = this
+                                            .question_inputs
+                                            .get(&key)
+                                            .map(|i| i.read(cx).content.to_string())
+                                            .unwrap_or_default();
+                                        if selected.is_empty() && custom.trim().is_empty() {
+                                            this.error = "请回答每个问题后再提交".into();
+                                            cx.notify();
+                                            return;
+                                        }
+                                        answers.push(
+                                            json!({"id":qid,"selected":selected,"custom":custom}),
+                                        );
+                                    }
+                                    this.answer(&id, json!({"answers":answers}));
+                                }),
+                            ));
                     }
                     body = body.child(card);
                 }
@@ -738,6 +842,25 @@ impl Render for View {
                 );
             }
             Tab::Memory => {
+                body = body.child(
+                    button(
+                        "clear-memory",
+                        if self.clear_memory_armed {
+                            "确认忘记所有记忆"
+                        } else {
+                            "清空所有记忆"
+                        },
+                    )
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        if this.clear_memory_armed {
+                            this.call("peko.memory", json!({"action":"clear"}), Reply::Memories);
+                            this.clear_memory_armed = false;
+                        } else {
+                            this.clear_memory_armed = true;
+                        }
+                        cx.notify();
+                    })),
+                );
                 body = body.child(
                     div()
                         .text_sm()
@@ -861,6 +984,11 @@ impl Render for View {
                     ));
             }
             Tab::Avatar => {
+                let mut choices = div().flex().gap_2();
+                for (id, label) in [("yumi", "Yumi"), ("bingtang", "冰糖"), ("ellen", "艾莲")] {
+                    choices=choices.child(button(format!("avatar-{id}"),label).on_click(cx.listener(move|this,_,_,cx|{this.save(json!({"avatar":id}));this.error="角色选择已保存，重启 PekoPet 后生效；请先运行 npm run assets -- --all 缓存模型。".into();cx.notify();})));
+                }
+                body = body.child(choices);
                 body = body.child(
                     div()
                         .text_lg()
@@ -900,6 +1028,94 @@ impl Render for View {
                         ),
                     );
                 }
+                for name in &self.catalog.layers {
+                    let on = name.clone();
+                    let off = name.clone();
+                    list = list.child(
+                        div()
+                            .flex()
+                            .gap_2()
+                            .child(
+                                button(format!("on{name}"), format!("开启 · {name}")).on_click(
+                                    cx.listener(move |this, _, _, _| {
+                                        this.native_command(Command::Cue(Cue {
+                                            layers: BTreeMap::from([(on.clone(), true)]),
+                                            ..Default::default()
+                                        }))
+                                    }),
+                                ),
+                            )
+                            .child(button(format!("off{name}"), "关闭").on_click(cx.listener(
+                                move |this, _, _, _| {
+                                    this.native_command(Command::Cue(Cue {
+                                        layers: BTreeMap::from([(off.clone(), false)]),
+                                        ..Default::default()
+                                    }))
+                                },
+                            ))),
+                    );
+                }
+                for p in self.catalog.parameters.clone() {
+                    let value = *self.debug_parameters.get(&p.id).unwrap_or(&p.default);
+                    let minus = p.clone();
+                    let plus = p.clone();
+                    list = list.child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .justify_between()
+                            .child(div().text_xs().child(format!(
+                                "{}  {:.2}  [{:.2}, {:.2}]",
+                                p.id, value, p.min, p.max
+                            )))
+                            .child(
+                                div()
+                                    .flex()
+                                    .gap_2()
+                                    .child(button(format!("minus{}", p.id), "−").on_click(
+                                        cx.listener(move |this, _, _, cx| {
+                                            let v = this
+                                                .debug_parameters
+                                                .entry(minus.id.clone())
+                                                .or_insert(minus.default);
+                                            *v =
+                                                (*v - (minus.max - minus.min) / 20.).max(minus.min);
+                                            let value = *v;
+                                            this.native_command(Command::Cue(Cue {
+                                                params: BTreeMap::from([(minus.id.clone(), value)]),
+                                                hold: Some(60000),
+                                                ..Default::default()
+                                            }));
+                                            cx.notify();
+                                        }),
+                                    ))
+                                    .child(button(format!("plus{}", p.id), "＋").on_click(
+                                        cx.listener(move |this, _, _, cx| {
+                                            let v = this
+                                                .debug_parameters
+                                                .entry(plus.id.clone())
+                                                .or_insert(plus.default);
+                                            *v = (*v + (plus.max - plus.min) / 20.).min(plus.max);
+                                            let value = *v;
+                                            this.native_command(Command::Cue(Cue {
+                                                params: BTreeMap::from([(plus.id.clone(), value)]),
+                                                hold: Some(60000),
+                                                ..Default::default()
+                                            }));
+                                            cx.notify();
+                                        }),
+                                    )),
+                            ),
+                    );
+                }
+                list = list.child(button("clear-avatar", "恢复默认表现").on_click(cx.listener(
+                    |this, _, _, _| {
+                        this.native_command(Command::Cue(Cue {
+                            clear: true,
+                            ..Default::default()
+                        }))
+                    },
+                )));
                 body=body.child(list).child(button("pet-through","切换鼠标穿透").on_click(cx.listener(|this,_,_,_|this.save(json!({"clickThrough":!this.settings["clickThrough"].as_bool().unwrap_or(false)})))));
                 let mut series = self.latencies.clone();
                 series.sort_by(f64::total_cmp);
@@ -969,6 +1185,9 @@ fn main() {
                     _ => 0,
                 };
                 window.on_window_should_close(cx, move |_, _| {
+                    if !native::is_alive() {
+                        return true;
+                    }
                     native::show_chat(hwnd, false);
                     false
                 });

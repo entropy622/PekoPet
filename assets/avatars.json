@@ -1,0 +1,26 @@
+{
+  "parameters": ["ParamAngleX", "ParamAngleY", "ParamAngleZ", "ParamBodyAngleX", "ParamBodyAngleY", "ParamBodyAngleZ", "ParamEyeLOpen", "ParamEyeROpen", "ParamEyeBallX", "ParamEyeBallY", "ParamBrowLY", "ParamBrowRY", "ParamBrowLAngle", "ParamBrowRAngle", "ParamMouthOpenY", "ParamMouthForm", "ParamCheek", "ParamBreath"],
+  "avatars": {
+    "yumi": {
+      "name": "Yumi",
+      "author": "Erara_艾拉拉",
+      "model": "yumi/yumi.model3.json",
+      "layers": ["拿话筒", "抬手右", "抬手左", "俯身按键", "漂浮小狗", "眼罩"],
+      "excluded": ["短发1", "短发2"]
+    },
+    "bingtang": {
+      "name": "冰糖",
+      "author": "神宫凉子",
+      "model": "免费模型冰糖/免费模型冰糖.model3.json",
+      "layers": [],
+      "excluded": ["shuiyin1", "shuiyin2", "danhair", "danhairL", "HAIR11", "HAIR2", "HAIR22", "HAIR3", "HAIR33", "hairR1", "Rhair"]
+    },
+    "ellen": {
+      "name": "艾莲",
+      "author": "神宫凉子 / 杨小唸",
+      "model": "免费模型艾莲/免费模型艾莲.model3.json",
+      "layers": [],
+      "excluded": ["shuiyin"]
+    }
+  }
+}

@@ -17,17 +17,24 @@ pub struct Rpc {
     writer: Sender<Value>,
     child: Arc<Mutex<Child>>,
     next: u64,
+    closed: bool,
     pub root: PathBuf,
 }
 impl Rpc {
-    pub fn start(root: PathBuf, events: Sender<Value>) -> Result<Self> {
+    pub fn start(root: PathBuf, events: Sender<Value>, generation: u64) -> Result<Self> {
         let logdir = root.join("work");
         fs::create_dir_all(&logdir)?;
         let stderr = OpenOptions::new()
             .create(true)
             .append(true)
             .open(logdir.join("dsh.log"))?;
-        let node = std::env::var_os("PEKO_NODE").unwrap_or_else(|| "node.exe".into());
+        let node = std::env::var_os("PEKO_NODE").unwrap_or_else(|| {
+            if root.join("node.exe").exists() {
+                root.join("node.exe").into_os_string()
+            } else {
+                "node.exe".into()
+            }
+        });
         let mut child = Command::new(node)
             .arg(root.join("scripts/launch-dsh.mjs"))
             .current_dir(&root)
@@ -48,7 +55,9 @@ impl Rpc {
                     stdin.write_all(b"\n")?;
                     stdin.flush()
                 })() {
-                    let _ = errors.send(json!({"transportError":e.to_string()}));
+                    let _ = errors.send(
+                        json!({"transportError":e.to_string(),"connectionGeneration":generation}),
+                    );
                     break;
                 }
             }
@@ -57,30 +66,32 @@ impl Rpc {
             for line in BufReader::new(stdout).lines() {
                 match line {
                     Ok(line) => match serde_json::from_str::<Value>(&line) {
-                        Ok(frame) => {
+                        Ok(mut frame) => {
+                            frame["connectionGeneration"] = json!(generation);
                             if events.send(frame).is_err() {
                                 break;
                             }
                         }
                         Err(e) => {
                             let _ = events.send(
-                                json!({"transportError":format!("dsh 输出了非协议内容: {e}")}),
+                                json!({"transportError":format!("dsh 输出了非协议内容: {e}"),"connectionGeneration":generation}),
                             );
                             break;
                         }
                     },
                     Err(e) => {
-                        let _ = events.send(json!({"transportError":e.to_string()}));
+                        let _ = events.send(json!({"transportError":e.to_string(),"connectionGeneration":generation}));
                         break;
                     }
                 }
             }
-            let _ = events.send(json!({"transportError":"dsh 连接已关闭，未自动重发任务"}));
+            let _ = events.send(json!({"transportError":"dsh 连接已关闭，未自动重发任务","connectionGeneration":generation}));
         });
         Ok(Self {
             writer: tx,
             child: Arc::new(Mutex::new(child)),
             next: 1,
+            closed: false,
             root,
         })
     }
@@ -93,9 +104,13 @@ impl Rpc {
         id
     }
     pub fn close(&mut self) {
+        if self.closed {
+            return;
+        }
+        self.closed = true;
         self.call("shutdown", json!({}));
         let child = self.child.clone();
-        thread::spawn(move || {
+        {
             for _ in 0..40 {
                 if child.lock().unwrap().try_wait().ok().flatten().is_some() {
                     return;
@@ -108,7 +123,7 @@ impl Rpc {
                 .creation_flags(0x08000000)
                 .status();
             let _ = child.lock().unwrap().wait();
-        });
+        }
     }
 }
 impl Drop for Rpc {

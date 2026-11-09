@@ -11,7 +11,7 @@
     "prepare:overlay": "node scripts/prepare-overlay.mjs",
     "assets": "node scripts/fetch-models.mjs",
     "start:dsh": "node scripts/launch-dsh.mjs",
-    "package:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1"
+    "package:windows": "powershell -NoProfile -File scripts/package.ps1"
   },
   "dependencies": {
     "@deepseek-ai/dsh": "0.2.1-alpha.4",

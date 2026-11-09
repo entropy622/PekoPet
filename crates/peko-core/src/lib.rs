@@ -170,7 +170,7 @@ fn marker_end(raw: &str) -> Option<usize> {
         if ch == '"' {
             quoted = !quoted;
         }
-        if !quoted && raw[i..].starts_with("]] ".trim_end()) {
+        if !quoted && raw[i..].starts_with("]]") {
             return Some(i);
         }
     }

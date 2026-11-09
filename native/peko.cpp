@@ -124,7 +124,7 @@ struct Pet{
         switch(msg){
             case WM_MOUSEACTIVATE:return MA_NOACTIVATE;
             case WM_LBUTTONDOWN:GetCursorPos(&p->drag);p->start={p->state.x,p->state.y};p->dragging=true;p->moved=false;SetCapture(hwnd);return 0;
-            case WM_MOUSEMOVE:if(p->dragging){POINT now;GetCursorPos(&now);p->state.x=p->start.x+now.x-p->drag.x;p->state.y=p->start.y+now.y-p->drag.y;if(abs(now.x-p->drag.x)+abs(now.y-p->drag.y)>4)p->moved=true;p->place();}return 0;
+            case WM_MOUSEMOVE:p->events|=8;if(p->dragging){POINT now;GetCursorPos(&now);p->state.x=p->start.x+now.x-p->drag.x;p->state.y=p->start.y+now.y-p->drag.y;if(abs(now.x-p->drag.x)+abs(now.y-p->drag.y)>4)p->moved=true;p->place();}return 0;
             case WM_LBUTTONUP:if(p->dragging){p->dragging=false;ReleaseCapture();p->events|=p->moved?4:1;}return 0;
             case WM_MOUSEWHEEL:p->state.scale=std::clamp(p->state.scale+(float)GET_WHEEL_DELTA_WPARAM(w)/1200.f,0.1f,4.f);p->events|=4;return 0;
             case WM_RBUTTONUP:p->menu();return 0;

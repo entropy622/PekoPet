@@ -1,14 +1,19 @@
 use anyhow::{Context, Result, bail};
 use peko_core::{AvatarState, Catalog, Cue, Parameter};
 use serde_json::{Value, json};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     ffi::{CStr, CString, c_char, c_void},
     path::{Path, PathBuf},
     sync::mpsc::{self, Sender},
     thread,
     time::{Duration, Instant},
 };
+static ALIVE: AtomicBool = AtomicBool::new(false);
+pub fn is_alive() -> bool {
+    ALIVE.load(Ordering::Acquire)
+}
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
@@ -65,7 +70,7 @@ pub enum Command {
     Quit,
 }
 pub struct Native {
-    pub tx: Sender<Command>,
+    pub tx: Sender<(Command, Instant)>,
 }
 pub fn show_chat(hwnd: isize, show: bool) {
     unsafe { peko_show_chat(hwnd, show as i32) }
@@ -75,20 +80,17 @@ fn discover(
     base: &Path,
     expressions: &mut BTreeMap<String, PathBuf>,
     motions: &mut BTreeMap<String, PathBuf>,
+    excluded: &BTreeSet<String>,
 ) -> Result<()> {
     for e in std::fs::read_dir(base)? {
         let p = e?.path();
         if p.is_dir() {
-            discover(&p, expressions, motions)?;
+            discover(&p, expressions, motions, excluded)?;
             continue;
         }
         let name = p.file_name().unwrap().to_string_lossy();
         if let Some(id) = name.strip_suffix(".exp3.json") {
-            let low = id.to_lowercase();
-            if ["水印", "shuiyin", "watermark", "hair", "服装", "衣服"]
-                .iter()
-                .any(|x| low.contains(x))
-            {
+            if excluded.contains(id) {
                 continue;
             }
             expressions.insert(id.to_owned(), p.clone());
@@ -99,35 +101,22 @@ fn discover(
     }
     Ok(())
 }
-fn layer(name: &str) -> bool {
-    [
-        "手",
-        "话筒",
-        "抱枕",
-        "游戏",
-        "pose",
-        "mic",
-        "prop",
-        "controller",
-        "pillow",
-        "特效",
-        "漂浮",
-    ]
-    .iter()
-    .any(|x| name.to_lowercase().contains(x))
+fn avatar_metadata() -> Value {
+    serde_json::from_str(include_str!("../../../assets/avatars.json"))
+        .expect("Built-in avatar catalog")
 }
-fn allowed_parameter(id: &str) -> bool {
-    [
-        "ParamAngle",
-        "ParamBodyAngle",
-        "ParamEye",
-        "ParamBrow",
-        "ParamMouth",
-        "ParamCheek",
-        "ParamBreath",
-    ]
-    .iter()
-    .any(|prefix| id.starts_with(prefix))
+fn names(value: &Value) -> BTreeSet<String> {
+    value
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|v| v.as_str().map(str::to_string))
+        .collect()
+}
+fn allowed_parameter(id: &str, metadata: &Value) -> bool {
+    metadata["parameters"]
+        .as_array()
+        .is_some_and(|ids| ids.iter().any(|v| v.as_str() == Some(id)))
 }
 fn rect(settings: &Value) -> Rect {
     Rect {
@@ -172,17 +161,30 @@ impl Native {
                 }
                 let mut expressions = BTreeMap::new();
                 let mut motions = BTreeMap::new();
-                discover(base, &mut expressions, &mut motions)?;
+                let metadata = avatar_metadata();
+                let id = settings["avatar"].as_str().unwrap_or("yumi");
+                let avatar = &metadata["avatars"][id];
+                let excluded = names(&avatar["excluded"]);
+                let layers = names(&avatar["layers"]);
+                discover(base, &mut expressions, &mut motions, &excluded)?;
                 let mut catalog = Catalog {
-                    name: "Yumi".into(),
-                    expressions: expressions.keys().filter(|n| !layer(n)).cloned().collect(),
-                    layers: expressions.keys().filter(|n| layer(n)).cloned().collect(),
+                    name: avatar["name"].as_str().unwrap_or(id).to_string(),
+                    expressions: expressions
+                        .keys()
+                        .filter(|n| !layers.contains(*n))
+                        .cloned()
+                        .collect(),
+                    layers: expressions
+                        .keys()
+                        .filter(|n| layers.contains(*n))
+                        .cloned()
+                        .collect(),
                     motions: motions.keys().cloned().collect(),
                     parameters: Vec::new(),
                 };
                 for i in 0..unsafe { peko_parameter_count(ptr) } {
                     let id = unsafe { s(peko_parameter_id(ptr, i)) };
-                    if !allowed_parameter(&id) {
+                    if !allowed_parameter(&id, &metadata) {
                         continue;
                     }
                     let (mut min, mut max, mut default) = (0., 0., 0.);
@@ -195,6 +197,7 @@ impl Native {
                     });
                 }
                 events.send(json!({"native":"catalog","catalog":catalog}))?;
+                ALIVE.store(true, Ordering::Release);
                 let start = Instant::now();
                 let mut previous = Instant::now();
                 let mut state = AvatarState::default();
@@ -202,7 +205,8 @@ impl Native {
                 let mut hidden = false;
                 let mut latency = Vec::new();
                 loop {
-                    for command in rx.try_iter() {
+                    let frame_started = Instant::now();
+                    for (command, received_at) in rx.try_iter() {
                         match command {
                             Command::Quit => return Ok(()),
                             Command::Cancel => state.cancel(),
@@ -225,9 +229,14 @@ impl Native {
                                 unsafe { peko_configure(ptr, r) };
                             }
                             Command::Cue(mut cue) => {
-                                catalog.validate(&mut cue).map_err(anyhow::Error::msg)?;
-                                let at = Instant::now();
+                                if let Err(message) = catalog.validate(&mut cue) {
+                                    events.send(json!({"native":"error","message":message}))?;
+                                    continue;
+                                }
                                 state.apply(&cue, start.elapsed().as_millis() as u64);
+                                let layers: BTreeMap<_, _> =
+                                    state.layers.iter().map(|n| (n.clone(), true)).collect();
+                                events.send(json!({"native":"state","state":{"layers":layers}}))?;
                                 if let Some(m) = &cue.motion {
                                     let p = c(&motions[m].to_string_lossy())?;
                                     if unsafe { peko_motion(ptr, p.as_ptr()) } == 0 {
@@ -235,7 +244,7 @@ impl Native {
                                     }
                                 }
                                 active_until = Instant::now() + Duration::from_secs(2);
-                                latency.push(at);
+                                latency.push(received_at);
                             }
                         }
                     }
@@ -282,15 +291,20 @@ impl Native {
                         let r = unsafe { peko_window_state(ptr) };
                         events.send(json!({"native":"settings","patch":{"petX":r.x,"petY":r.y,"petScale":r.scale,"topmost":r.topmost!=0,"clickThrough":r.through!=0}}))?;
                     }
-                    thread::sleep(if hidden {
+                    if e & 8 != 0 {
+                        active_until = Instant::now() + Duration::from_millis(250);
+                    }
+                    let interval = if hidden {
                         Duration::from_millis(100)
                     } else if Instant::now() < active_until {
                         Duration::from_millis(16)
                     } else {
                         Duration::from_millis(33)
-                    });
+                    };
+                    thread::sleep(interval.saturating_sub(frame_started.elapsed()));
                 }
             })();
+            ALIVE.store(false, Ordering::Release);
             if let Err(e) = result {
                 let _ = events.send(json!({"native":"error","message":format!("{e:#}")}));
             }
@@ -299,9 +313,14 @@ impl Native {
     }
 }
 
-pub fn default_model() -> PathBuf {
+pub fn model_path(id: &str) -> PathBuf {
     let home = std::env::var_os("DSH_HOME")
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from(std::env::var_os("USERPROFILE").unwrap()).join(".dsh"));
-    home.join("peko-pet/models/LLM_Live2D/public/live2D/yumi/yumi.model3.json")
+    let metadata = avatar_metadata();
+    let relative = metadata["avatars"][id]["model"]
+        .as_str()
+        .expect("Known avatar id");
+    home.join("peko-pet/models/LLM_Live2D/public/live2D")
+        .join(relative)
 }

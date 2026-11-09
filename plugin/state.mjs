@@ -28,6 +28,7 @@ export class State {
       CREATE TABLE IF NOT EXISTS messages (session TEXT NOT NULL, seq INTEGER NOT NULL, role TEXT NOT NULL, text TEXT NOT NULL, PRIMARY KEY(session,seq));
       CREATE TABLE IF NOT EXISTS memory_cursors (session TEXT PRIMARY KEY, seq INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS greetings (day TEXT PRIMARY KEY, count INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS avatar_states (session TEXT PRIMARY KEY, state TEXT NOT NULL);
       PRAGMA user_version=1;`);
   }
   settings() { return { ...defaultSettings, ...JSON.parse(this.db.prepare('SELECT value FROM settings WHERE id=1').get()?.value ?? '{}') }; }
@@ -41,6 +42,7 @@ export class State {
       next[key] = value;
     }
     if (next.persona.length > 12000 || next.idleMinutes < 1 || next.idleMinutes > 1440 || next.activeStart < 0 || next.activeEnd > 24 || next.activeStart >= next.activeEnd || next.maxDailyGreetings < 0 || next.maxDailyGreetings > 20 || next.petScale < 0.1 || next.petScale > 4) throw new Error('设置超出范围');
+    if(!['yumi','bingtang','ellen'].includes(next.avatar))throw new Error('角色必须选自固定目录');
     this.db.prepare('INSERT OR REPLACE INTO settings VALUES(1,?)').run(JSON.stringify(next)); return next;
   }
   memories() { return this.db.prepare('SELECT id,text,source_session AS sourceSession,source_seq AS sourceSeq,created FROM memories ORDER BY created').all(); }
@@ -75,6 +77,8 @@ export class State {
     this.db.prepare('UPDATE sessions SET cwd=? WHERE id=?').run(cwd,id);
   }
   sessions() { return this.db.prepare('SELECT * FROM sessions ORDER BY created DESC').all(); }
+  avatarState(session) { return JSON.parse(this.db.prepare('SELECT state FROM avatar_states WHERE session=?').get(session)?.state??'{}'); }
+  setAvatarState(session,state) { this.db.prepare('INSERT OR REPLACE INTO avatar_states VALUES(?,?)').run(session,JSON.stringify(state)); }
   message(session, seq, role, text) {
     this.db.prepare('INSERT OR IGNORE INTO messages VALUES(?,?,?,?)').run(session,seq,role,text);
     if(role==='user') this.db.prepare("UPDATE sessions SET title=? WHERE id=? AND title='新对话'").run(text.slice(0,40),session);
