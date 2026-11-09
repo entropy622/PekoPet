@@ -1,0 +1,15 @@
+import { spawn } from 'node:child_process';
+import { createRequire } from 'node:module';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { prepareOverlay } from './prepare-overlay.mjs';
+import { prepareSharedProfile } from './shared-profile.mjs';
+import { homedir } from 'node:os';
+const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
+const require=createRequire(import.meta.url);
+const cli=resolve(dirname(require.resolve('@deepseek-ai/dsh/package.json')),'lib/bin.js');
+const overlay=prepareOverlay(root);
+prepareSharedProfile(process.env.DSH_HOME||resolve(homedir(),'.dsh'));
+const child=spawn(process.execPath,['--import',pathToFileURL(resolve(root,'scripts/stdio.mjs')).href,cli,'--profile','peko','--patch',overlay],{stdio:'inherit',windowsHide:true,env:process.env});
+child.once('error',e=>{console.error('dsh 启动失败:',e.message);process.exitCode=1;});
+child.once('exit',code=>{process.exitCode=code??1;});

@@ -1,0 +1,24 @@
+name: Windows checks
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm test
+      - run: cargo test -p peko-core --locked
+      - name: Type-check GPUI client
+        env:
+          PEKO_TYPECHECK: '1'
+        run: cargo check -p pekopet --locked
+      - name: Build native application when licensed Core is present
+        if: hashFiles('vendor/cubism-core/include/Live2DCubismCore.h') != ''
+        run: cargo build -p pekopet --release --locked

@@ -1,0 +1,12 @@
+/target/
+/node_modules/
+/runtime/
+/dist/
+/work/
+/local/
+.env
+*.log
+*.sqlite3*
+*.user
+*.pdb
+!vendor/**
