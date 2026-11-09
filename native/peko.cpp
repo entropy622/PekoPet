@@ -113,7 +113,7 @@ struct Pet{
     std::vector<ComPtr<ID3D11ShaderResourceView>> textures;std::unique_ptr<Model> model;
     NOTIFYICONDATAW tray{};bool frameworkStarted=false,comStarted=false;CubismFramework::Option option;char monitorName[128]{};int dpi=96;
     void dragTick(){
-        POINT now;GetCursorPos(&now);
+        POINT now{};if(!GetCursorPos(&now)){dragging=false;KillTimer(hwnd,1);return;}
         if(abs(now.x-drag.x)+abs(now.y-drag.y)>4)moved=true;
         if(moved){state.x=start.x+now.x-drag.x;state.y=start.y+now.y-drag.y;place();}
         events|=8;
@@ -149,7 +149,7 @@ struct Pet{
         if(!p)return DefWindowProcW(hwnd,msg,w,l);
         switch(msg){
             case WM_MOUSEACTIVATE:return MA_NOACTIVATE;
-            case WM_LBUTTONDOWN:GetCursorPos(&p->drag);p->start={p->state.x,p->state.y};p->dragging=true;p->moved=false;SetTimer(hwnd,1,16,nullptr);p->events|=8;return 0;
+            case WM_LBUTTONDOWN:if(!GetCursorPos(&p->drag))return 0;p->start={p->state.x,p->state.y};p->dragging=true;p->moved=false;SetTimer(hwnd,1,16,nullptr);p->events|=8;return 0;
             case WM_MOUSEMOVE:p->events|=8;return 0;
             case WM_TIMER:if(w==1&&p->dragging){p->dragTick();return 0;}break;
             case WM_LBUTTONUP:if(p->dragging){p->dragTick();if(p->dragging)p->finishDrag();}return 0;
@@ -182,7 +182,7 @@ struct Pet{
     }
     void draw(float dt){
         if(!state.visible)return;
-        POINT cursor;GetCursorPos(&cursor);float gx=std::clamp((cursor.x-state.x-state.width*.5f)/600.f,-1.f,1.f),gy=std::clamp((state.y+state.height*.4f-cursor.y)/600.f,-1.f,1.f);
+        POINT cursor{state.x+state.width/2,state.y+state.height*2/5};GetCursorPos(&cursor);float gx=std::clamp((cursor.x-state.x-state.width*.5f)/600.f,-1.f,1.f),gy=std::clamp((state.y+state.height*.4f-cursor.y)/600.f,-1.f,1.f);
         model->update(std::min(dt,0.1f),gx,gy);
         const float clear[4]={0,0,0,0};context->ClearRenderTargetView(target.Get(),clear);auto rtv=target.Get();context->OMSetRenderTargets(1,&rtv,nullptr);
         D3D11_VIEWPORT vp{0,0,(float)state.width,(float)state.height,0,1};context->RSSetViewports(1,&vp);
