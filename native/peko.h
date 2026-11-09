@@ -24,7 +24,8 @@ const char* peko_monitor(void* pet);
 int peko_dpi(void* pet);
 void peko_configure(void* pet,PekoRect state);
 void peko_show_chat(intptr_t hwnd,int show);
-void peko_notify(void* pet);
+void peko_show_chat_quiet(intptr_t hwnd);
+void peko_notify(void* pet,const char* message);
 #ifdef __cplusplus
 }
 #endif

@@ -72,7 +72,11 @@ export class State {
     this.db.prepare('UPDATE memories SET text=?,fingerprint=? WHERE id=?').run(text.trim(), fingerprint(text), id);
     return this.memories();
   }
-  clearMemories() { for (const m of this.memories()) this.deleteMemory(m.id); return []; }
+  clearMemories() {
+    for (const m of this.memories()) this.deleteMemory(m.id);
+    for (const row of this.db.prepare("SELECT session,MAX(seq) AS seq FROM messages WHERE role='user' GROUP BY session").all()) this.advanceMemory(row.session,row.seq);
+    return [];
+  }
   rememberSession(id, cwd, title = '新对话') {
     this.db.prepare('INSERT OR IGNORE INTO sessions VALUES(?,?,?,?)').run(id, title.slice(0,60), cwd, new Date().toISOString());
     this.db.prepare('UPDATE sessions SET cwd=? WHERE id=?').run(cwd,id);
@@ -83,6 +87,7 @@ export class State {
   message(session, seq, role, text) {
     this.db.prepare('INSERT OR IGNORE INTO messages VALUES(?,?,?,?)').run(session,seq,role,text);
     if(role==='user') this.db.prepare("UPDATE sessions SET title=? WHERE id=? AND title='新对话'").run(text.slice(0,40),session);
+    if(role==='user'&&!this.settings().memoryEnabled)this.advanceMemory(session,seq);
   }
   messages(session) { return this.db.prepare('SELECT seq,role,text FROM messages WHERE session=? ORDER BY seq').all(session); }
   pendingUserFacts(session) {

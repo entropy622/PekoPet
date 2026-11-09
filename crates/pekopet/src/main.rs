@@ -575,7 +575,7 @@ impl View {
                             self.local_state("done");
                         }
                         if !self.settings["dnd"].as_bool().unwrap_or(false) {
-                            self.native_command(Command::Notify);
+                            self.native_command(Command::Notify("这件事处理好了，点我查看。"));
                         }
                     }
                     self.status = "在你身边".into();
@@ -595,9 +595,13 @@ impl View {
                     }
                 }
                 self.approvals.push(p.clone());
+                self.tab = Tab::Chat;
                 self.status = "等你决定".into();
                 self.local_state("waiting");
-                native::show_chat(self.chat_hwnd, true);
+                native::show_chat_quiet(self.chat_hwnd);
+                if !self.settings["dnd"].as_bool().unwrap_or(false) {
+                    self.native_command(Command::Notify("需要你做个决定，点我查看。"));
+                }
             }
             "peko.withdraw" => {
                 self.approvals.retain(|a| a["id"] != p["id"]);
@@ -611,7 +615,7 @@ impl View {
             "peko.reminder" => {
                 self.reminders.push(p.clone());
                 if !self.settings["dnd"].as_bool().unwrap_or(false) {
-                    self.native_command(Command::Notify);
+                    self.native_command(Command::Notify("提醒到了，点我查看。"));
                 }
             }
             "peko.error" => self.error = p["message"].as_str().unwrap_or("dsh 故障").into(),
@@ -1285,7 +1289,7 @@ impl Render for View {
                     series[((series.len() as f64 * 0.95).ceil() as usize).saturating_sub(1)]
                 };
                 body = body.child(div().text_xs().child(format!(
-                    "表情处理到帧提交 P95 {p95:.1} ms · {} 次 · 首正文 {:.0} ms",
+                    "完整标记到帧提交 P95 {p95:.1} ms · {} 次 · 首 token {:.0} ms",
                     series.len(),
                     self.first_token_ms.unwrap_or(0.)
                 )));

@@ -122,8 +122,9 @@ export function apply(ctx) {
       const result=memoryResults.get(memoryId);
       const parsed=JSON.parse(result.replace(/^```(?:json)?\s*|\s*```$/g,''));
       if(!Array.isArray(parsed))throw new Error('记忆整理输出格式错误');
+      const current=new Set(state.pendingUserFacts(sessionId).map(f=>f.seq));
       for(const item of parsed.slice(0,5)) {
-        if(typeof item?.text==='string'&&facts.some(f=>f.seq===item.sourceSeq)&&!containsSecret(item.text))state.addMemory(item.text,sessionId,item.sourceSeq);
+        if(typeof item?.text==='string'&&current.has(item.sourceSeq)&&facts.some(f=>f.seq===item.sourceSeq)&&!containsSecret(item.text))state.addMemory(item.text,sessionId,item.sourceSeq);
       }
       state.advanceMemory(sessionId,seq);notify('peko.memory.changed',{memories:state.memories()});
     } finally {workers.delete(sessionId);memoryResults.delete(memoryId);memoryHandles.delete(memoryId);if(handle)await handle.dispose();}

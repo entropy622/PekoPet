@@ -211,5 +211,6 @@ const char* peko_monitor(void* p){return ((Pet*)p)->monitorName;}
 int peko_dpi(void* p){return ((Pet*)p)->dpi;}
 void peko_configure(void* p,PekoRect s){((Pet*)p)->state=s;((Pet*)p)->place();}
 void peko_show_chat(intptr_t hwnd,int show){if(show){ShowWindow((HWND)hwnd,SW_RESTORE);SetForegroundWindow((HWND)hwnd);}else ShowWindow((HWND)hwnd,SW_HIDE);}
-void peko_notify(void* raw){auto p=(Pet*)raw;auto info=p->tray;info.uFlags=NIF_INFO;info.dwInfoFlags=NIIF_INFO|NIIF_NOSOUND;wcscpy_s(info.szInfoTitle,L"PekoPet");wcscpy_s(info.szInfo,L"这件事处理好了，点我查看。");Shell_NotifyIconW(NIM_MODIFY,&info);}
+void peko_show_chat_quiet(intptr_t hwnd){ShowWindow((HWND)hwnd,SW_SHOWNOACTIVATE);}
+void peko_notify(void* raw,const char* message){auto p=(Pet*)raw;auto info=p->tray;info.uFlags=NIF_INFO;info.dwInfoFlags=NIIF_INFO|NIIF_NOSOUND;wcscpy_s(info.szInfoTitle,L"PekoPet");MultiByteToWideChar(CP_UTF8,0,message,-1,info.szInfo,(int)std::size(info.szInfo));Shell_NotifyIconW(NIM_MODIFY,&info);}
 }

@@ -48,7 +48,8 @@ unsafe extern "C" {
     fn peko_dpi(p: *mut c_void) -> i32;
     fn peko_configure(p: *mut c_void, state: Rect);
     fn peko_show_chat(hwnd: isize, show: i32);
-    fn peko_notify(p: *mut c_void);
+    fn peko_show_chat_quiet(hwnd: isize);
+    fn peko_notify(p: *mut c_void, message: *const c_char);
 }
 fn c(s: &str) -> Result<CString> {
     Ok(CString::new(s)?)
@@ -72,13 +73,16 @@ pub enum Command {
     Settings(Value),
     Hide(bool),
     Quit,
-    Notify,
+    Notify(&'static str),
 }
 pub struct Native {
     pub tx: Sender<(Command, Option<Instant>)>,
 }
 pub fn show_chat(hwnd: isize, show: bool) {
     unsafe { peko_show_chat(hwnd, show as i32) }
+}
+pub fn show_chat_quiet(hwnd: isize) {
+    unsafe { peko_show_chat_quiet(hwnd) }
 }
 
 fn discover(
@@ -213,7 +217,10 @@ impl Native {
                     for (command, received_at) in rx.try_iter() {
                         match command {
                             Command::Quit => return Ok(()),
-                            Command::Notify => unsafe { peko_notify(ptr) },
+                            Command::Notify(message) => {
+                                let text = c(message)?;
+                                unsafe { peko_notify(ptr, text.as_ptr()) };
+                            }
                             Command::Cancel => {
                                 state.cancel();
                                 unsafe { peko_cancel_motion(ptr) };
