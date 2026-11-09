@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][string]$SdkPath)
+﻿param([Parameter(Mandatory=$true)][string]$SdkPath)
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 $sdk=(Resolve-Path -LiteralPath $SdkPath).Path
@@ -7,11 +7,12 @@ $manifest=Join-Path $core 'RedistributableFiles.txt'
 if(-not(Test-Path -LiteralPath $manifest)){throw '缺少 Core/RedistributableFiles.txt，请使用官方 Cubism Native 5-r.5 SDK。'}
 $list=Get-Content -LiteralPath $manifest -Raw
 $header=Join-Path $core 'include/Live2DCubismCore.h'
-$lib=Get-ChildItem -LiteralPath (Join-Path $core 'lib/windows/x86_64') -Filter 'Live2DCubismCore_MD.lib' -Recurse | Where-Object {$_.FullName -match '[\\/]143[\\/]'} | Select-Object -First 1
-if(-not $lib){throw 'SDK 中缺少 Windows x64 / v143 的 Live2DCubismCore_MD.lib。'}
-$files=@(@{Source=$header;Target='include/Live2DCubismCore.h'},@{Source=$lib.FullName;Target='lib/Live2DCubismCore_MD.lib'})
+$libraryPath='lib/windows/x86_64/143/Live2DCubismCore_MD.lib'
+$lib=Join-Path $core $libraryPath
+if(-not(Test-Path -LiteralPath $lib)){throw 'SDK 中缺少 Windows x64 / v143 的 Live2DCubismCore_MD.lib。'}
+$files=@(@{Source=$header;Relative='include/Live2DCubismCore.h';Target='include/Live2DCubismCore.h'},@{Source=$lib;Relative=$libraryPath;Target='lib/Live2DCubismCore_MD.lib'})
 foreach($file in $files){
-  $relative=$file.Source.Substring($core.Length).TrimStart('\','/').Replace('\','/')
+  $relative=$file.Relative
   $permitted=$false
   foreach($line in ($list -split "`r?`n")){
     $entry=$line.Trim().Replace('\','/').TrimStart('./')

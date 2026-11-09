@@ -14,6 +14,7 @@ int peko_parameter_count(void* pet);
 const char* peko_parameter_id(void* pet,int index);
 void peko_parameter_info(void* pet,int index,float* min,float* max,float* initial);
 void peko_reset_targets(void* pet);
+void peko_cancel_motion(void* pet);
 int peko_expression(void* pet,const char* file,float weight);
 void peko_parameter(void* pet,const char* id,float value);
 int peko_motion(void* pet,const char* file);
@@ -21,6 +22,7 @@ int peko_tick(void* pet,float delta_seconds);
 PekoRect peko_window_state(void* pet);
 void peko_configure(void* pet,PekoRect state);
 void peko_show_chat(intptr_t hwnd,int show);
+void peko_notify(void* pet);
 #ifdef __cplusplus
 }
 #endif

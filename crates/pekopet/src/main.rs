@@ -75,6 +75,8 @@ struct View {
     question_choices: HashMap<String, Vec<String>>,
     debug_parameters: BTreeMap<String, f32>,
     clear_memory_armed: bool,
+    final_reconciled: bool,
+    semantic_cues: bool,
 }
 fn button(id: impl Into<SharedString>, text: impl Into<SharedString>) -> Stateful<Div> {
     div()
@@ -137,6 +139,8 @@ impl View {
             question_choices: HashMap::new(),
             debug_parameters: BTreeMap::new(),
             clear_memory_armed: false,
+            final_reconciled: false,
+            semantic_cues: false,
         };
         this.connect();
         cx.spawn(async move |weak, cx| {
@@ -202,6 +206,26 @@ impl View {
             let _ = p.tx.send((command, Instant::now()));
         }
     }
+    fn local_state(&self, state: &str) {
+        if let Some(p) = self
+            .catalog
+            .parameters
+            .iter()
+            .find(|p| p.id == "ParamAngleZ")
+        {
+            let offset = match state {
+                "thinking" => 6.,
+                "working" => 3.,
+                "waiting" => -6.,
+                _ => 0.,
+            };
+            self.native_command(Command::Cue(Cue {
+                params: BTreeMap::from([(p.id.clone(), (p.default + offset).clamp(p.min, p.max))]),
+                hold: Some(1200),
+                ..Default::default()
+            }));
+        }
+    }
     fn send(&mut self, _: &SendMessage, _: &mut Window, cx: &mut Context<Self>) {
         if !self.connected || self.busy {
             return;
@@ -221,6 +245,8 @@ impl View {
         self.first_token_ms = None;
         self.current_text = None;
         self.error.clear();
+        self.semantic_cues = false;
+        self.local_state("thinking");
         self.call("session/prompt",json!({"sessionId":self.session,"contentBlocks":[{"type":"text","text":text}],"avatar":self.catalog}),Reply::Ordinary);
         cx.notify();
     }
@@ -243,7 +269,10 @@ impl View {
                     self.messages[i].text.push_str(&text);
                 }
                 Output::Cue(mut cue) => match self.catalog.validate(&mut cue) {
-                    Ok(()) => self.native_command(Command::Cue(cue)),
+                    Ok(()) => {
+                        self.semantic_cues = true;
+                        self.native_command(Command::Cue(cue));
+                    }
                     Err(e) => self.error = e,
                 },
                 Output::Invalid(e) => self.error = e,
@@ -381,7 +410,11 @@ impl View {
                         .iter()
                         .map(|m| Message {
                             role: m["role"].as_str().unwrap_or("assistant").into(),
-                            text: visible_text(m["text"].as_str().unwrap_or("")),
+                            text: if m["role"] == "assistant" {
+                                visible_text(m["text"].as_str().unwrap_or(""))
+                            } else {
+                                m["text"].as_str().unwrap_or("").to_string()
+                            },
                         })
                         .collect();
                     if let Ok(cue) = serde_json::from_value::<Cue>(r["avatarState"].clone()) {
@@ -403,6 +436,7 @@ impl View {
                         if self.cursor.start(attempt, rev) {
                             self.parsers.clear();
                             self.current_text = None;
+                            self.final_reconciled = false;
                         }
                     }
                     "chunk" => {
@@ -422,10 +456,10 @@ impl View {
                                         self.outputs(out);
                                     }
                                     "tool-call-delta" => {
-                                        self.status = format!(
-                                            "正在工作 · {}",
-                                            c["name"].as_str().unwrap_or("工具")
-                                        )
+                                        if let Some(name) = c["name"].as_str() {
+                                            self.status = format!("正在工作 · {name}");
+                                            self.local_state("working");
+                                        }
                                     }
                                     _ => {}
                                 }
@@ -439,8 +473,11 @@ impl View {
                         }
                     }
                     "end" => {
-                        let out: Vec<_> =
+                        let mut out: Vec<_> =
                             self.parsers.values_mut().flat_map(|p| p.finish()).collect();
+                        if self.final_reconciled {
+                            out.retain(|o| !matches!(o, Output::Text(_)));
+                        }
                         self.outputs(out);
                         self.parsers.clear();
                         if f["outcome"]["eventType"] == "assistant/attempt"
@@ -455,6 +492,7 @@ impl View {
             "session.event" if p["sessionId"].as_str() == Some(&self.session) => {
                 let event = &p["event"];
                 if event["type"] == "assistant/message" {
+                    self.final_reconciled = true;
                     let raw: String = event["data"]["message"]["content"]
                         .as_array()
                         .unwrap_or(&Vec::new())
@@ -478,10 +516,39 @@ impl View {
             }
             "peko.work" if p["sessionId"].as_str() == Some(&self.session) => {
                 self.status = "正在处理工具结果".into();
+                let message = &p["event"]["data"]["message"];
+                let raw: String = message["content"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter(|b| b["type"] == "text")
+                    .filter_map(|b| b["text"].as_str())
+                    .collect();
+                self.messages.push(Message {
+                    role: "tool".into(),
+                    text: format!(
+                        "{}\n{}",
+                        if message["isError"] == true {
+                            "工具失败"
+                        } else {
+                            "工具结果"
+                        },
+                        raw.chars().take(1600).collect::<String>()
+                    ),
+                });
             }
             "session.status" if p["sessionId"].as_str() == Some(&self.session) => {
+                let was_busy = self.busy;
                 self.busy = p["status"] == "running";
                 if !self.busy {
+                    if was_busy {
+                        if !self.semantic_cues {
+                            self.local_state("done");
+                        }
+                        if !self.settings["dnd"].as_bool().unwrap_or(false) {
+                            self.native_command(Command::Notify);
+                        }
+                    }
                     self.status = "在你身边".into();
                     self.call("peko.sessions", json!({}), Reply::Sessions);
                 }
@@ -500,9 +567,15 @@ impl View {
                 }
                 self.approvals.push(p.clone());
                 self.status = "等你决定".into();
+                self.local_state("waiting");
                 native::show_chat(self.chat_hwnd, true);
             }
-            "peko.withdraw" => self.approvals.retain(|a| a["id"] != p["id"]),
+            "peko.withdraw" => {
+                self.approvals.retain(|a| a["id"] != p["id"]);
+                let prefix = format!("{}/", p["id"].as_str().unwrap_or(""));
+                self.question_inputs.retain(|k, _| !k.starts_with(&prefix));
+                self.question_choices.retain(|k, _| !k.starts_with(&prefix));
+            }
             "peko.memory.changed" => {
                 self.memories = p["memories"].as_array().cloned().unwrap_or_default()
             }
@@ -689,13 +762,13 @@ impl Render for View {
                             .rounded_lg()
                             .p_4()
                             .bg(rgb(if m.role == "user" { 0x2b3c42 } else { 0x202a35 }))
-                            .child(
-                                div()
-                                    .mb_2()
-                                    .text_xs()
-                                    .text_color(rgb(0xb1c4be))
-                                    .child(if m.role == "user" { "你" } else { "Peko" }),
-                            )
+                            .child(div().mb_2().text_xs().text_color(rgb(0xb1c4be)).child(
+                                match m.role.as_str() {
+                                    "user" => "你",
+                                    "tool" => "工作过程",
+                                    _ => "Peko",
+                                },
+                            ))
                             .child(div().text_sm().child(m.text.clone()))
                             .child(button(format!("copy{i}"), "复制").mt_2().on_click(
                                 move |_, _, cx| {
@@ -942,7 +1015,33 @@ impl Render for View {
                             this.save(json!({"persona":persona}));
                         },
                     )));
-                body=body.child(button("proactive",if self.settings["proactive"].as_bool().unwrap_or(true){"主动陪伴已开启 · 点击关闭"}else{"开启适度主动陪伴"}).on_click(cx.listener(|this,_,_,_|this.save(json!({"proactive":!this.settings["proactive"].as_bool().unwrap_or(true)}))))).child(div().text_sm().text_color(rgb(0x93a5b7)).child("默认空闲 60 分钟后轻声招呼，每日最多两次，09:00—22:00。勿扰期间保持安静。"));
+                body=body.child(button("proactive",if self.settings["proactive"].as_bool().unwrap_or(true){"主动陪伴已开启 · 点击关闭"}else{"开启适度主动陪伴"}).on_click(cx.listener(|this,_,_,_|this.save(json!({"proactive":!this.settings["proactive"].as_bool().unwrap_or(true)})))));
+                let mut frequency = div().flex().gap_2();
+                for (minutes, count, label) in [
+                    (30, 4, "多聊一点"),
+                    (60, 2, "适度陪伴"),
+                    (120, 1, "安静陪伴"),
+                ] {
+                    frequency = frequency.child(
+                        button(format!("frequency-{minutes}"), label)
+                            .when(
+                                self.settings["idleMinutes"].as_i64() == Some(minutes),
+                                |s| s.bg(rgb(0x45524f)),
+                            )
+                            .on_click(cx.listener(move |this, _, _, _| {
+                                this.save(json!({"idleMinutes":minutes,"maxDailyGreetings":count}))
+                            })),
+                    );
+                }
+                body =
+                    body.child(frequency)
+                        .child(div().text_sm().text_color(rgb(0x93a5b7)).child(format!(
+                        "空闲 {} 分钟后招呼，每日最多 {} 次，{:02}:00—{:02}:00。勿扰期间保持安静。",
+                        self.settings["idleMinutes"].as_i64().unwrap_or(60),
+                        self.settings["maxDailyGreetings"].as_i64().unwrap_or(2),
+                        self.settings["activeStart"].as_i64().unwrap_or(9),
+                        self.settings["activeEnd"].as_i64().unwrap_or(22)
+                    )));
             }
             Tab::Models => {
                 body = body.child(div().text_sm().child(
@@ -1169,6 +1268,7 @@ fn main() {
         let bounds = Bounds::centered(None, size(px(1000.), px(760.)), cx);
         cx.open_window(
             WindowOptions {
+                focus: false,
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
                 titlebar: Some(TitlebarOptions {
                     title: Some("PekoPet · 你的桌面搭档".into()),

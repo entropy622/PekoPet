@@ -14,11 +14,11 @@ The invocation overlay disables browser presentation and mounts the SDK startup 
 
 `[[peko:{"mix":{"星星眼":0.8},"hold":2500}]]` changes a temporary emotional overlay. `params` holds whitelisted model parameter values, `motion` chooses an existing motion, `layers` toggles persistent poses and props, and `clear` removes previous overlays. Names and parameter ranges come from the loaded model. Control markers are hidden from display and copy while raw dsh transcripts retain them.
 
-The native window uses a premultiplied-alpha DirectComposition swapchain and Cubism D3D11 renderer. Texture decoding stays in Rust so WebP assets work without optional Windows codecs. Cubism parameters reload the saved motion baseline every frame before gaze, expressions and physics. Expression targets ease over 120 ms.
+The native window uses a premultiplied-alpha DirectComposition swapchain and Cubism D3D11 renderer. Framework shaders are embedded at build time and served through Cubism's file callbacks. Texture decoding stays in Rust so WebP assets work without optional Windows codecs. Cubism parameters reload the saved motion baseline every frame before gaze, expressions and physics. Expression targets ease over 120 ms.
 
 ## State and recovery
 
-Conversations remain in dsh persistence. SQLite contains only the PekoPet session index, visible message projection, preferences, memories, deletion fingerprints and proactive counters. Deletion fingerprints prevent an automatically extracted fact from returning. Every memory also retains its source session and event sequence.
+Conversations remain in dsh persistence. SQLite contains the PekoPet session index, message projection, preferences, memories, deletion fingerprints, persistent avatar layers and proactive counters. Deletion fingerprints prevent an automatically extracted fact from returning. Every memory also retains its source session and event sequence.
 
 Transport loss does not replay a user prompt. The user reconnects and resumes the existing session. Shutdown first requests dsh disposal; the process-tree fallback targets only the application-owned launcher PID.
 

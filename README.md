@@ -2,7 +2,7 @@
 
 使用 Rust、GPUI、原生 Live2D Cubism 和 DeepSeek Harness 的 Windows 桌面搭档。
 
-角色窗口独立透明显示；聊天与设置使用 GPUI。模型正文流里的 `[[peko:...]]` 标记即时驱动表情、动作和参数，聊天显示会隐藏控制标记。工作工具、MCP、skills、凭据和权限继续由 dsh 管理。
+角色窗口独立透明显示；聊天与设置使用 GPUI。模型正文流里的 `[[peko:{"motion":"wave"}]]` 标记即时驱动表情、动作和参数，聊天显示会隐藏控制标记。工作工具、MCP、skills、凭据和权限继续由 dsh 管理。
 
 ## 在 Windows 构建
 
@@ -24,6 +24,8 @@ cargo run --release -p pekopet
 
 已有 clone 可运行 `git submodule update --init --recursive` 补齐 Framework。使用其他已有角色时运行 `npm run assets -- --all`。模型存入本机 DSH_HOME 下的缓存，保留原作者署名和使用说明。
 
+便携包首次运行使用 `PekoPet.cmd`，它会缓存默认模型再打开程序。此后可以直接打开 `pekopet.exe`。Node 随便携包提供，运行模型缓存无需 Git。
+
 ## 第一次使用
 
 先确保 dsh desktop 已配置可用模型。PekoPet 默认使用同一个 `DSH_HOME`（未设置时为 `~/.dsh`），读取 desktop 的模型、MCP 和插件设置。dsh 保留 desktop 启动入口给 Electron，因此 PekoPet 使用引用 desktop 配置的专用 peko profile。它不创建第二套 API Key 或 MCP 配置。
@@ -33,7 +35,7 @@ cargo run --release -p pekopet
 - 托盘菜单提供置顶、显示、隐藏与退出。关闭聊天保留桌宠。
 - “项目”按钮选择工作目录；工具审批由你决定，可随时停止任务。
 - “共同记忆”可编辑、删除、清空或暂停自动记忆。
-- “相处方式”修改人格，主动陪伴和勿扰分别控制。
+- “相处方式”修改人格，选择陪伴频率；主动陪伴和勿扰分别控制。
 - “模型与连接”选择已有模型，配置变更后重新连接，不会自动重发任务。
 - “角色调试”预览表情、动作、持久层和参数范围；固定角色选择在重启后生效。
 

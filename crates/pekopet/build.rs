@@ -35,6 +35,20 @@ fn main() {
     files.push(framework.join("Rendering/CubismRenderer.cpp"));
     collect(&framework.join("Rendering/D3D11"), &mut files);
     files.push(root.join("native/peko.cpp"));
+    let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
+    let mut shaders = String::new();
+    for (name, symbol) in [
+        ("CubismEffect.fx", "PEKO_EFFECT_SHADER"),
+        ("CubismBlendMode.fx", "PEKO_BLEND_SHADER"),
+    ] {
+        let file = framework.join("Rendering/D3D11/Shaders").join(name);
+        let source = fs::read_to_string(&file).expect("Cubism D3D11 shader source");
+        shaders.push_str(&format!(
+            "static const char {symbol}[] = R\"PEKO_FX({source})PEKO_FX\";\n"
+        ));
+        println!("cargo:rerun-if-changed={}", file.display());
+    }
+    fs::write(out.join("peko_shaders.h"), shaders).expect("Embed Cubism shaders");
     let mut build = cc::Build::new();
     build
         .cpp(true)
@@ -43,6 +57,7 @@ fn main() {
         .flag("/EHsc")
         .define("NOMINMAX", None)
         .include(&framework)
+        .include(&out)
         .include(core.join("include"))
         .include(root.join("native"));
     for file in &files {

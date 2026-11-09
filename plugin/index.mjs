@@ -1,13 +1,14 @@
 import { HarnessSdkJsonRpcServer } from '@deepseek-ai/dsh-sdk-jsonrpc-server';
 import { JsonRpcLineTransport } from '@deepseek-ai/dsh-sdk-protocol';
 import { createUserMessage } from '@deepseek-ai/dsh-llm';
+import { scopeOf } from '@deepseek-ai/dsh-scope';
 import { resolve, join } from 'node:path';
 import { homedir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { State, containsSecret } from './state.mjs';
 
 export const name='peko-bridge';
-export const inject=['agents','llm','systemPrompt','workingDirectory','sdkAppStartup','agentPresets'];
+export const inject=['agents','llm','systemPrompt','workingDirectory','sdkAppStartup','agentPresets','tools','skills'];
 const textOf=message=>(message?.content??[]).filter(b=>b.type==='text').map(b=>b.text).join('');
 const requiredString=(p,k)=>{if(typeof p?.[k]!=='string'||!p[k])throw new Error(`需要 ${k}`);return p[k];};
 
@@ -16,7 +17,9 @@ export function apply(ctx) {
   const state=new State(join(home,'peko-pet/state.sqlite3'));
   const transport=new JsonRpcLineTransport(process.stdin,process.stdout);
   const sdk=new HarnessSdkJsonRpcServer(ctx,transport);
-  const owned=new Set(), pending=new Map(), avatars=new Map(), workers=new Set(),memoryResults=new Map(),proactiveRestrictions=new Map(),memoryHandles=new Map(),background=new Set();
+  const owned=new Set(), pending=new Map(), avatars=new Map(), workers=new Set(),memoryResults=new Map(),proactiveRestrictions=new Map(),memoryHandles=new Map(),background=new Set(),lineage=new Map();
+  function own(id){owned.add(id);lineage.set(id,id);}
+  ctx.on('session/created',session=>{const parent=String(session.header.parentSession??'');if(lineage.has(parent))lineage.set(String(session.id),lineage.get(parent));});
   let route, closing=false, lastActivity=Date.now(), idleGreetingAt=0;
   const notify=(method,params)=>transport.notify(method,params);
   const error=e=>{console.error('[PekoPet]',e?.stack??String(e));notify('peko.error',{message:String(e?.message??e)});};
@@ -26,7 +29,7 @@ export function apply(ctx) {
     if(!state.sessions().some(s=>s.id===id))return {error:new Error('提醒所属会话未由 PekoPet 管理')};
     try {
       let agent=ctx.agents.get(id);
-      if(!agent){if(!route)throw new Error('请先选择模型并连接');owned.add(id);await sdk.resume({sessionId:id});agent=ctx.agents.get(id);}
+      if(!agent){if(!route)throw new Error('请先选择模型并连接');own(id);await sdk.resume({sessionId:id});agent=ctx.agents.get(id);}
       if(!agent)throw new Error('提醒会话恢复失败');return {agent};
     }catch(error){return {error};}
   }});
@@ -38,8 +41,8 @@ export function apply(ctx) {
   async function caps(params={}) {
     await ctx.get('loader')?.await();
     const agent=typeof params.sessionId==='string'?ctx.agents.get(params.sessionId):undefined;
-    const tools=agent?agent.ctx.tools.schemas().map(s=>({name:s.name,description:s.description})):[];
-    const skills=agent?await agent.ctx.skills.snapshot({cwd:(await sdk.getWorkingDirectory({sessionId:params.sessionId})).cwd}):{skills:[],complete:false};
+    const tools=agent?ctx.tools.schemas(scopeOf(agent.ctx)).map(s=>({name:s.name,description:s.description})):[];
+    const skills=agent?await ctx.skills.snapshot({scope:scopeOf(agent.ctx),cwd:(await sdk.getWorkingDirectory({sessionId:params.sessionId})).cwd}):{skills:[],complete:false};
     return {version:'0.1.0',protocol:1,home,profile:'peko',sharedProfile:'desktop',defaultModel:ctx.get('agentDefaultModel')?.currentSelection(),providers:await models(),settings:state.settings(),sessions:state.sessions(),tools,skills,features:['stream','cancel','approvals','questions','memory','avatar','schedule']};
   }
   function avatarContext(id) {
@@ -69,7 +72,11 @@ export function apply(ctx) {
       if(event.type==='assistant/message'||m?.source?.kind==='user')state.message(id,event.seq,event.type==='user/message'?'user':'assistant',textOf(m));
       if(event.type==='user/message'&&m?.source?.kind==='user'){proactiveRestrictions.get(id)?.();proactiveRestrictions.delete(id);}
     }
-    if(event.type==='tool/result')notify('peko.work',{sessionId:id,kind:'result',event});
+    if(event.type==='tool/result'){
+      const message=event.data.message;
+      state.message(id,event.seq,'tool',`${message.isError?'工具失败':'工具结果'}\n${textOf(message)}`);
+      notify('peko.work',{sessionId:id,kind:'result',event});
+    }
   });
   ctx.on('agent/status',({agent,status})=>{
     const id=String(agent.session.id); if(!owned.has(id))return;
@@ -78,7 +85,7 @@ export function apply(ctx) {
       const task=extractMemory(id).catch(error);background.add(task);void task.finally(()=>background.delete(task));
     }
   });
-  ctx.on('agent/error',({agent,error:e})=>{if(owned.has(String(agent.session.id))||memoryResults.has(String(agent.session.id)))error(e);});
+  ctx.on('agent/error',({agent,error:e})=>{if(lineage.has(String(agent.session.id))||memoryResults.has(String(agent.session.id)))error(e);});
 
   function waitForAnswer(kind,req) {
     const id=randomUUID(),sessionId=String(req.agent.session.id);
@@ -87,12 +94,12 @@ export function apply(ctx) {
       const settle=value=>{if(!pending.delete(id))return;req.signal?.removeEventListener('abort',abort);notify('peko.withdraw',{id});resolve(value);};
       pending.set(id,{kind,sessionId,settle,reject});
       req.signal?.addEventListener('abort',abort,{once:true});
-      notify('peko.approval',{id,sessionId,kind,toolName:req.toolName,reason:req.reason,questions:req.questions,callId:req.callId??req.wait?.callId});
+      notify('peko.approval',{id,sessionId,rootSessionId:lineage.get(sessionId),kind,toolName:req.toolName,reason:req.reason,questions:req.questions,callId:req.callId??req.wait?.callId});
       if(req.signal?.aborted)abort();
     });
   }
-  ctx.on('approval/request',(req,next)=>owned.has(String(req.agent.session.id))?waitForAnswer('approval',req):next());
-  ctx.on('user-questions/request',(req,next)=>req.agent&&owned.has(String(req.agent.session.id))?waitForAnswer('questions',req):next());
+  ctx.on('approval/request',(req,next)=>lineage.has(String(req.agent.session.id))?waitForAnswer('approval',req):next());
+  ctx.on('user-questions/request',(req,next)=>req.agent&&lineage.has(String(req.agent.session.id))?waitForAnswer('questions',req):next());
 
   async function extractMemory(sessionId) {
     if(closing||!route||!state.settings().memoryEnabled||workers.has(sessionId))return;
@@ -119,7 +126,7 @@ export function apply(ctx) {
     } finally {workers.delete(sessionId);memoryResults.delete(memoryId);memoryHandles.delete(memoryId);if(handle)await handle.dispose();}
   }
   async function prompt(p) {
-    const sessionId=requiredString(p,'sessionId');owned.add(sessionId);
+    const sessionId=requiredString(p,'sessionId');own(sessionId);
     const cwd=(await sdk.getWorkingDirectory({sessionId})).cwd;
     state.rememberSession(sessionId,cwd);
     if(p.avatar)avatars.set(sessionId,{catalog:p.avatar,state:state.avatarState(sessionId)});
@@ -133,8 +140,8 @@ export function apply(ctx) {
       state.updateSettings(route);return sdk.initialize(p);
     }
     if(method==='session/prompt')return prompt(p);
-    if(method==='session/resume') {owned.add(requiredString(p,'sessionId'));return sdk.resume(p);}
-    if(method==='peko.open') {const id=requiredString(p,'sessionId');owned.add(id);return ctx.agents.get(id)?{}:sdk.resume({sessionId:id});}
+    if(method==='session/resume') {own(requiredString(p,'sessionId'));return sdk.resume(p);}
+    if(method==='peko.open') {const id=requiredString(p,'sessionId');own(id);return ctx.agents.get(id)?{}:sdk.resume({sessionId:id});}
     if(method==='peko.history'){const id=requiredString(p,'sessionId');return {messages:state.messages(id),avatarState:state.avatarState(id)};}
     if(method==='peko.sessions')return {sessions:state.sessions()};
     if(method==='peko.settings')return p.patch?state.updateSettings(p.patch):state.settings();
@@ -167,7 +174,7 @@ export function apply(ctx) {
       }return {memories:state.memories()};
     }
     if(method==='session/working-directory/set') {
-      owned.add(requiredString(p,'sessionId'));
+      own(requiredString(p,'sessionId'));
       const r=await sdk.setWorkingDirectory(p);state.rememberSession(p.sessionId,r.cwd);return r;
     }
     return sdk.handleRequest(method,p);

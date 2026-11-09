@@ -38,6 +38,7 @@ unsafe extern "C" {
     fn peko_parameter_id(p: *mut c_void, i: i32) -> *const c_char;
     fn peko_parameter_info(p: *mut c_void, i: i32, min: *mut f32, max: *mut f32, initial: *mut f32);
     fn peko_reset_targets(p: *mut c_void);
+    fn peko_cancel_motion(p: *mut c_void);
     fn peko_expression(p: *mut c_void, file: *const c_char, weight: f32) -> i32;
     fn peko_parameter(p: *mut c_void, id: *const c_char, value: f32);
     fn peko_motion(p: *mut c_void, file: *const c_char) -> i32;
@@ -45,6 +46,7 @@ unsafe extern "C" {
     fn peko_window_state(p: *mut c_void) -> Rect;
     fn peko_configure(p: *mut c_void, state: Rect);
     fn peko_show_chat(hwnd: isize, show: i32);
+    fn peko_notify(p: *mut c_void);
 }
 fn c(s: &str) -> Result<CString> {
     Ok(CString::new(s)?)
@@ -68,6 +70,7 @@ pub enum Command {
     Settings(Value),
     Hide(bool),
     Quit,
+    Notify,
 }
 pub struct Native {
     pub tx: Sender<(Command, Instant)>,
@@ -202,16 +205,18 @@ impl Native {
                 let mut previous = Instant::now();
                 let mut state = AvatarState::default();
                 let mut active_until = Instant::now();
-                let mut hidden = false;
                 let mut latency = Vec::new();
                 loop {
                     let frame_started = Instant::now();
                     for (command, received_at) in rx.try_iter() {
                         match command {
                             Command::Quit => return Ok(()),
-                            Command::Cancel => state.cancel(),
+                            Command::Notify => unsafe { peko_notify(ptr) },
+                            Command::Cancel => {
+                                state.cancel();
+                                unsafe { peko_cancel_motion(ptr) };
+                            }
                             Command::Hide(h) => {
-                                hidden = h;
                                 let mut r = unsafe { peko_window_state(ptr) };
                                 r.visible = (!h) as i32;
                                 unsafe { peko_configure(ptr, r) };
@@ -272,12 +277,15 @@ impl Native {
                     if e < 0 {
                         return Err(ffi_error());
                     }
+                    let hidden = unsafe { peko_window_state(ptr) }.visible == 0;
                     if !hidden {
                         for at in latency.drain(..) {
                             events.send(
                                 json!({"native":"latency","ms":at.elapsed().as_secs_f64()*1000.}),
                             )?;
                         }
+                    } else {
+                        latency.clear();
                     }
                     if e & 1 != 0 {
                         events.send(json!({"native":"show"}))?;

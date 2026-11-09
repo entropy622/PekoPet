@@ -30,6 +30,13 @@ export function apply(ctx){
         const payload=JSON.parse(data);text=JSON.stringify([{text:'用户喜欢兔子',sourceSeq:payload.messages.at(-1).seq}]);
       }else{
         if(!options.tools?.length)throw new Error('desktop preset tools missing');
+        if(last==='mcp'&&!options.messages.some(m=>m.role==='tool'&&m.toolCallId==='fixture-echo')){
+          const block={type:'tool-call',id:'fixture-echo',name:'mcp__fixture__echo',arguments:JSON.stringify({text:'MCP shared configuration round trip'})};
+          yield {type:'block-start',index:0,blockType:'tool-call'};
+          yield {type:'tool-call-delta',index:0,id:block.id,name:block.name,argumentsDelta:block.arguments};
+          yield {type:'block-end',index:0,block};yield {type:'finish',reason:{kind:'tool-calls'}};return;
+        }
+        if(last==='mcp'&&!options.messages.filter(m=>m.role==='tool').some(m=>JSON.stringify(m.content).includes('MCP shared configuration round trip')))throw new Error('MCP result missing');
         text='[[peko:{"mix":{"星星眼":0.8},"hold":1000}]]你好，我是 Peko。';
       }
       yield {type:'block-start',index:0,blockType:'text'};

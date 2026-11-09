@@ -230,7 +230,9 @@ impl AvatarState {
             self.mix.clear();
             self.params.clear();
         }
-        self.mix.clone_from(&cue.mix);
+        if !cue.mix.is_empty() {
+            self.mix.clone_from(&cue.mix);
+        }
         self.params.clone_from(&cue.params);
         for (name, enabled) in &cue.layers {
             if *enabled {
@@ -369,5 +371,21 @@ mod tests {
         assert_eq!(c.params["x"], 1.);
         c.motion = Some("missing".into());
         assert!(cat.validate(&mut c).is_err());
+    }
+    #[test]
+    fn a_pose_change_keeps_the_existing_emotion() {
+        let mut s = AvatarState::default();
+        let mut c = Cue::default();
+        c.mix.insert("happy".into(), 0.6);
+        s.apply(&c, 0);
+        s.apply(
+            &Cue {
+                layers: BTreeMap::from([("mic".into(), true)]),
+                ..Default::default()
+            },
+            100,
+        );
+        assert_eq!(s.mix["happy"], 0.6);
+        assert!(s.layers.contains("mic"));
     }
 }
