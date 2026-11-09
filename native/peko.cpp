@@ -112,6 +112,14 @@ struct Pet{
     ComPtr<ID3D11RenderTargetView> target;ComPtr<IDCompositionDevice> composition;ComPtr<IDCompositionTarget> compTarget;ComPtr<IDCompositionVisual> visual;
     std::vector<ComPtr<ID3D11ShaderResourceView>> textures;std::unique_ptr<Model> model;
     NOTIFYICONDATAW tray{};bool frameworkStarted=false,comStarted=false;CubismFramework::Option option;char monitorName[128]{};int dpi=96;
+    void dragTick(){
+        POINT now;GetCursorPos(&now);
+        if(abs(now.x-drag.x)+abs(now.y-drag.y)>4)moved=true;
+        if(moved){state.x=start.x+now.x-drag.x;state.y=start.y+now.y-drag.y;place();}
+        events|=8;
+        if(!(GetAsyncKeyState(VK_LBUTTON)&0x8000))finishDrag();
+    }
+    void finishDrag(){dragging=false;KillTimer(hwnd,1);events|=moved?4:1;}
     void place(){
         RECT work{},bounds{state.x,state.y,state.x+state.width,state.y+state.height};HMONITOR monitor=MonitorFromRect(&bounds,MONITOR_DEFAULTTONEAREST);
         MONITORINFOEXW info{};info.cbSize=sizeof(info);GetMonitorInfoW(monitor,&info);work=info.rcWork;
@@ -141,9 +149,10 @@ struct Pet{
         if(!p)return DefWindowProcW(hwnd,msg,w,l);
         switch(msg){
             case WM_MOUSEACTIVATE:return MA_NOACTIVATE;
-            case WM_LBUTTONDOWN:GetCursorPos(&p->drag);p->start={p->state.x,p->state.y};p->dragging=true;p->moved=false;SetCapture(hwnd);return 0;
-            case WM_MOUSEMOVE:p->events|=8;if(p->dragging){POINT now;GetCursorPos(&now);p->state.x=p->start.x+now.x-p->drag.x;p->state.y=p->start.y+now.y-p->drag.y;if(abs(now.x-p->drag.x)+abs(now.y-p->drag.y)>4)p->moved=true;p->place();}return 0;
-            case WM_LBUTTONUP:if(p->dragging){p->dragging=false;ReleaseCapture();p->events|=p->moved?4:1;}return 0;
+            case WM_LBUTTONDOWN:GetCursorPos(&p->drag);p->start={p->state.x,p->state.y};p->dragging=true;p->moved=false;SetTimer(hwnd,1,16,nullptr);p->events|=8;return 0;
+            case WM_MOUSEMOVE:p->events|=8;return 0;
+            case WM_TIMER:if(w==1&&p->dragging){p->dragTick();return 0;}break;
+            case WM_LBUTTONUP:if(p->dragging){p->dragTick();if(p->dragging)p->finishDrag();}return 0;
             case WM_MOUSEWHEEL:p->state.scale=std::clamp(p->state.scale+(float)GET_WHEEL_DELTA_WPARAM(w)/1200.f,0.1f,4.f);p->events|=4;return 0;
             case WM_RBUTTONUP:p->menu();return 0;
             case WM_HOTKEY:if(w==1)p->events|=1;else{p->state.through=!p->state.through;p->place();p->events|=4;}return 0;
