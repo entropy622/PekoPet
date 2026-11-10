@@ -29,6 +29,7 @@ enum Reply {
     Capabilities,
     Initialized,
     Settings,
+    SettingsSaved(&'static str),
     Memories,
     History,
     Sessions,
@@ -48,6 +49,7 @@ struct View {
     cwd: String,
     status: String,
     error: String,
+    notice: String,
     connected: bool,
     busy: bool,
     tab: Tab,
@@ -97,6 +99,7 @@ impl View {
                 .into_owned(),
             status: "正在连接 dsh".into(),
             error: String::new(),
+            notice: String::new(),
             connected: false,
             busy: false,
             tab: Tab::Chat,
@@ -392,9 +395,12 @@ impl View {
                         );
                     }
                 }
-                Reply::Settings => {
+                Reply::Settings | Reply::SettingsSaved(_) => {
                     self.settings = r.clone();
                     self.native_command(Command::Settings(r.clone()));
+                    if let Reply::SettingsSaved(message) = reply {
+                        self.notice = message.into();
+                    }
                 }
                 Reply::Memories => {
                     self.memories = r["memories"].as_array().cloned().unwrap_or_default()

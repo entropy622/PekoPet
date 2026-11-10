@@ -1,4 +1,5 @@
 use super::*;
+use crate::ui::surface;
 use crate::ui::{self, *};
 
 impl Tab {
@@ -46,6 +47,7 @@ impl View {
                     .child(icon(glyph))
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.tab = tab;
+                        this.notice.clear();
                         if tab == Tab::Memory {
                             this.call("peko.memory", json!({}), Reply::Memories);
                         }
@@ -252,7 +254,6 @@ impl View {
             .gap_4()
             .p_6()
             .child(mark(80.))
-            .child(caption("A LITTLE COMPANY, A LITTLE MAGIC").mt_3())
             .child(
                 div()
                     .text_size(px(28.))
@@ -468,7 +469,7 @@ impl View {
         )
     }
 
-    fn approval_cards(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Div {
+    fn approval_cards(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Stateful<Div> {
         let mut cards = div()
             .id("approvals")
             .max_h(px(300.))
@@ -681,7 +682,7 @@ impl View {
                         let text=this.memory_input.read(cx).content.to_string();if text.trim().is_empty(){return;}let params=if let Some(id)=this.editing.take(){json!({"action":"edit","id":id,"text":text})}else{json!({"action":"add","text":text})};this.call("peko.memory",params,Reply::Memories);this.memory_input.update(cx,|i,cx|i.set("",cx));cx.notify();})))))
     }
 
-    fn persona_page(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Div {
+    fn persona_page(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Stateful<Div> {
         let proactive = self.settings["proactive"].as_bool().unwrap_or(true);
         let mut frequency = div().flex().flex_wrap().gap_3();
         for (minutes, count, label) in [
@@ -706,7 +707,7 @@ impl View {
             .child(surface().child(heading("Peko 是怎样的伙伴？","编辑人格设定，保存后从下一轮对话生效。"))
                 .child(div().rounded(px(16.)).bg(rgb(CANVAS)).p_5().text_size(px(15.)).line_height(relative(1.65)).child(self.persona.read(cx).content.clone()))
                 .child(self.persona.clone())
-                .child(div().flex().justify_end().child(ui::primary("persona-save","保存人格",window,cx).child(icon("check")).on_click(cx.listener(|this,_,_,cx|{let persona=this.persona.read(cx).content.to_string();this.save(json!({"persona":persona}));})))))
+                .child(div().flex().justify_end().child(ui::primary("persona-save","保存人格",window,cx).child(icon("check")).on_click(cx.listener(|this,_,_,cx|{let persona=this.persona.read(cx).content.to_string();this.call("peko.settings",json!({"patch":{"persona":persona}}),Reply::SettingsSaved("人格已保存，下一轮对话生效"));})))))
             .child(surface().child(div().flex().justify_between().items_center().gap_4().child(heading("陪伴，也留白","在你空闲的时候，偶尔来打个招呼。"))
                 .child(ui::button("proactive",if proactive{"已开启"}else{"已关闭"},window,cx).child(toggle(proactive)).on_click(cx.listener(|this,_,_,_|this.save(json!({"proactive":!this.settings["proactive"].as_bool().unwrap_or(true)}))))))
                 .child(frequency).child(caption(format!("空闲 {} 分钟后招呼 · 每日最多 {} 次 · {:02}:00—{:02}:00",
@@ -820,9 +821,11 @@ impl View {
                     cx,
                 )
                 .on_click(cx.listener(move |this, _, _, cx| {
-                    this.save(json!({"avatar":id}));
-                    this.error =
-                        "角色已保存，重启 PekoPet 后生效。请先缓存该角色的模型文件。".into();
+                    this.call(
+                        "peko.settings",
+                        json!({"patch":{"avatar":id}}),
+                        Reply::SettingsSaved("角色已保存，重启后生效。请先缓存该角色的模型文件。"),
+                    );
                     cx.notify();
                 })),
             );
@@ -1028,6 +1031,18 @@ impl Render for View {
                     .child(self.error.clone()),
             );
         }
+        if !self.notice.is_empty() {
+            body = body.child(
+                div()
+                    .rounded(px(16.))
+                    .px_5()
+                    .py_3()
+                    .bg(rgb(MINT_BG))
+                    .text_color(rgb(MINT))
+                    .text_size(px(14.))
+                    .child(self.notice.clone()),
+            );
+        }
         for reminder in self.reminders.clone() {
             let id = reminder["sessionId"].as_str().unwrap_or("").to_owned();
             body = body.child(
@@ -1064,7 +1079,12 @@ impl Render for View {
         let page = match self.tab {
             Tab::Chat => self.chat(window, cx),
             Tab::Memory => self.memory_page(window, cx),
-            Tab::Persona => self.persona_page(window, cx),
+            Tab::Persona => div()
+                .flex_1()
+                .min_h_0()
+                .flex()
+                .flex_col()
+                .child(self.persona_page(window, cx)),
             Tab::Models => self.models_page(window, cx),
             Tab::Avatar => self.avatar_page(window, cx),
         };

@@ -65,7 +65,7 @@ pub fn icon(name: &'static str) -> Svg {
 }
 pub fn glow(alpha: f32, offset: f32, blur: f32) -> Vec<BoxShadow> {
     vec![BoxShadow {
-        color: rgba(0x6366f1ff).opacity(alpha).into(),
+        color: Hsla::from(rgb(PRIMARY)).opacity(alpha),
         offset: point(px(0.), px(offset)),
         blur_radius: px(blur),
         spread_radius: px(0.),

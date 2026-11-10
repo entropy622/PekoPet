@@ -12,6 +12,18 @@ pub fn utf16_to_utf8(text: &str, offset: usize) -> usize {
     bytes
 }
 
+pub fn composition_selection(
+    text: &str,
+    start: usize,
+    selected: Option<std::ops::Range<usize>>,
+) -> std::ops::Range<usize> {
+    selected
+        .map(|range| {
+            start + utf16_to_utf8(text, range.start)..start + utf16_to_utf8(text, range.end)
+        })
+        .unwrap_or_else(|| start + text.len()..start + text.len())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -28,5 +40,15 @@ mod tests {
         let document = "prefix 你好 suffix";
         let cursor = start + utf16_to_utf8("你好", 1);
         assert_eq!(&document[..cursor], "prefix 你");
+    }
+    #[test]
+    fn replacing_an_existing_composition_keeps_both_offsets_relative_to_its_start() {
+        assert_eq!(composition_selection("你好", 7, Some(0..1)), 7..10);
+        assert_eq!(composition_selection("a😊好", 5, Some(1..3)), 6..10);
+    }
+    #[test]
+    fn composition_without_selection_places_the_caret_at_the_new_end() {
+        assert_eq!(composition_selection("你好", 7, None), 13..13);
+        assert_eq!(composition_selection("", 7, None), 7..7);
     }
 }
