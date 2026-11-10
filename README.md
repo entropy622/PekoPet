@@ -34,7 +34,7 @@ npm run dev
 npm run dev
 ```
 
-此命令自动加载本机 x64 C++ 开发环境，用 Cargo 增量构建并启动原生程序。PekoPet 的界面扩展位于 `plugin/frontend`；聊天源码固定在 `vendor/dsh-ui-chat`，沿用 dsh 的会话、工具、审批与问题组件，仅在正文显示和复制入口过滤表情标记。通过 npm override 加载同一份聊天组件。修改这些 JS/CSS 文件不触发 Rust 重编译。重启开发程序即可加载更新。只编译可用 `npm run build`。发布便携包仍使用 `npm run package:windows`；GitHub Actions 保留测试与发布候选包构建。
+此命令自动加载本机 x64 C++ 开发环境，用 Cargo 增量构建并启动原生程序。PekoPet 的界面扩展位于 `plugin/frontend`；聊天源码固定在 `vendor/dsh-ui-chat`，沿用 dsh 的会话、工具、审批与问题组件，仅在正文显示和复制入口过滤表情标记。通过 npm override 加载同一份聊天组件。修改这些 JS/CSS 文件不触发 Rust 重编译。运行 `npm run build:frontend`，再在应用中重新连接 dsh 即可加载更新。只编译可用 `npm run build`。发布便携包仍使用 `npm run package:windows`；GitHub Actions 保留测试与发布候选包构建。
 
 运行 `npx playwright install webkit` 准备 WebKit 测试浏览器，再运行 `npm run check:ui`。测试在屏幕外的原生 Tauri/WebView2 窗口检查界面，通过 CDP 操作组件，并使用无头 WebKit 检查同一套 React 前端。它连接真实 dsh loop 的脚本模型，使用临时 DSH_HOME 和项目目录；文件工具只操作该测试目录，不移动系统鼠标、不激活前台窗口。截图和报告写入 `work/ui-checks`。标题栏、任务栏与托盘图标使用本机 Live2D 模型渲染的大头图，缓存于 `DSH_HOME/peko-pet/icons`，附带作者信息。
 
@@ -50,7 +50,7 @@ npm run dev
 - 聊天沿用 dsh 的工作区、文件选择、模型选择、工具审批和停止任务入口。
 - “共同记忆”可编辑、删除、清空或暂停自动记忆。
 - “相处方式”修改人格，选择陪伴频率；主动陪伴和勿扰分别控制。
-- “模型与连接”显示共享目录与连接状态；聊天中的模型选择沿用 dsh。配置变更后重新连接，不会自动重发任务。
+- “模型与连接”显示共享目录与连接状态；聊天中的模型选择沿用 dsh。配置变更后重新连接，不会自动重发任务。PekoPet 在本机状态目录保留专用 Web 端口，使 dsh 的浏览器会话选择与偏好跨重连保留。
 - “角色调试”预览表情、动作、持久层和参数范围；固定角色选择在重启后生效。
 
 ## 表情协议

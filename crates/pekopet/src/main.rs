@@ -295,6 +295,7 @@ impl Companion {
         }
         if let Some(error) = e["transportError"].as_str() {
             self.error = error.into();
+            *self.origin.lock().unwrap() = None;
             self.status = "连接已断开".into();
             self.busy = false;
             self.parsers.clear();
@@ -428,14 +429,15 @@ impl Companion {
                         }
                     },
                     "end" => {
-                        let out = self.parsers.values_mut().flat_map(|p| p.finish()).collect();
-                        self.outputs(out, at);
-                        self.parsers.clear();
                         if f["outcome"]["eventType"] == "assistant/attempt"
                             || f["outcome"]["kind"] == "abandoned"
                         {
                             self.command(Command::Cancel, None);
+                        } else {
+                            let out = self.parsers.values_mut().flat_map(|p| p.finish()).collect();
+                            self.outputs(out, at);
                         }
+                        self.parsers.clear();
                     }
                     _ => {}
                 }

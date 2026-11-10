@@ -21,14 +21,14 @@ const executable=process.env.PEKO_UI_EXE||join(root,'target/debug/pekopet.exe');
 const app=spawn(executable,[],{cwd:runtimeRoot,windowsHide:true,env:{...process.env,PEKO_ROOT:runtimeRoot,PEKO_NODE:existsSync(join(runtimeRoot,'node.exe'))?join(runtimeRoot,'node.exe'):process.execPath,DSH_HOME:home,PEKO_UI_TEST:'1',PEKO_UI_CHECK_PORT:String(port),PEKO_DSH_PATCH:patch,PEKO_UI_FIXTURE_CATALOG:catalog},stdio:['ignore','pipe','pipe']});
 let stderr='';app.stderr.on('data',v=>stderr+=v);const exited=new Promise(r=>app.once('exit',r));
 writeFileSync(join(out,'process.json'),JSON.stringify({pid:app.pid,home,port,executable},null,2));
-let browser,page,other;const consoleErrors=[],images=[],checks=[];
+let browser,page,other,reconnecting=false;const consoleErrors=[],images=[],checks=[];
 const until=async(test,timeout=30000)=>{const end=Date.now()+timeout;for(;;){if(await test())return;if(Date.now()>end)throw new Error('Timed out waiting for condition');await new Promise(r=>setTimeout(r,100));}};
 const snap=async(p,name)=>{const file=name+'.png';await p.screenshot({path:join(out,file),animations:'disabled'});images.push(file);};
 const tab=async(p,name)=>{await p.getByRole('button',{name,exact:true}).click();};
 try{
   await until(async()=>{if(app.exitCode!==null)throw new Error('Native app exited: '+stderr);try{return(await fetch(`http://127.0.0.1:${port}/json/version`)).ok;}catch{return false;}},45000);
   browser=await chromium.connectOverCDP(`http://127.0.0.1:${port}`);page=browser.contexts()[0].pages()[0];
-  page.on('pageerror',e=>consoleErrors.push(String(e)));page.on('console',m=>{if(m.type()==='error')consoleErrors.push(m.text());});
+  page.on('pageerror',e=>consoleErrors.push(String(e)));page.on('console',m=>{if(m.type()==='error'&&!(reconnecting&&(m.text().includes('WebSocket')||m.text().includes('ERR_CONNECTION_REFUSED'))))consoleErrors.push(m.text());});
   await page.waitForSelector('[data-peko-ready]',{timeout:180000});
   const intro=page.getByRole('button',{name:'继续',exact:true});await Promise.race([intro.waitFor({state:'visible'}),page.locator('[contenteditable=true]').first().waitFor({state:'visible'})]);if(await intro.isVisible()){await intro.click();await intro.waitFor({state:'hidden'});}
   const invoke=(command,args={})=>page.evaluate(({command,args})=>window.__TAURI__.core.invoke(command,args),{command,args});
@@ -66,11 +66,14 @@ try{
   await send('cancel');const stop=page.getByRole('button',{name:'停止生成',exact:true});await stop.waitFor();await page.locator('[data-chat-running]').waitFor();assert.equal(await page.locator('[data-chat-running] svg').evaluateAll(nodes=>nodes.every(n=>n.getBoundingClientRect().width<=32)),true,'Running indicator dimensions');await snap(page,'dsh-running');await stop.click();await until(async()=>!(await invoke('peko_state')).busy);await stop.waitFor({state:'hidden'});assert.equal((await page.locator('#root').innerText()).includes('[[peko:'),false);assert.equal((await invoke('peko_state')).error,'');checks.push('original dsh stop cancels streaming; interrupted markers remain hidden');
   await page.evaluate(async()=>{await window.__TAURI__.event.listen('peko-external-link',event=>{window.__pekoExternalLink=event.payload;});window.open('https://example.com/peko-link-test','_blank','noopener,noreferrer');});await until(async()=>await page.evaluate(()=>window.__pekoExternalLink==='https://example.com/peko-link-test'));checks.push('HTTP links dispatch to the native system-browser path; test mode launches no external browser');
   const url=caps.frontendUrl;other=await webkit.launch({headless:true});const wk=await other.newPage({viewport:{width:1120,height:800}});
-  await wk.exposeFunction('__pekoInvoke',(command,args)=>invoke(command,args));
+  await wk.exposeFunction('__pekoInvoke',(command,args)=>command==='peko_activate'?Promise.resolve():invoke(command,args));
   await wk.addInitScript(()=>{window.__TAURI__={core:{invoke:(command,args)=>window.__pekoInvoke(command,args)},event:{listen:async()=>()=>{}}};});
   await wk.goto(url);await wk.waitForSelector('[data-peko-ready]',{timeout:60000});const wkIntro=wk.getByRole('button',{name:'继续',exact:true});if(await wkIntro.isVisible()){await wkIntro.click();await wkIntro.waitFor({state:'hidden'});}
   await snap(wk,'webkit-chat');await tab(wk,'相处方式');await wk.getByRole('textbox',{name:'人格',exact:true}).waitFor();await snap(wk,'webkit-persona');checks.push('WebKit renders the same frontend and navigates React panes, using the test native bridge');
   assert.deepEqual(consoleErrors.filter(e=>!e.includes('503')),[], 'Browser errors');
+  await other.close();other=null;
+  reconnecting=true;const navigation=page.waitForEvent('domcontentloaded',{timeout:180000});await invoke('peko_reconnect');await navigation;await page.waitForSelector('[data-peko-ready]',{timeout:180000});reconnecting=false;
+  assert.equal(new URL(page.url()).origin,new URL(url).origin,'Stable local origin');await page.getByText('你好，我是 Peko。',{exact:true}).first().waitFor();await until(async()=>(await invoke('peko_state')).sessionId===selected.sessionId);assert.equal((await invoke('peko_state')).settings.persona,'你是离屏测试的 Peko，工作时简洁直接。');assert.equal(readFileSync(join(project,'fixture.txt'),'utf8'),'after');checks.push('reconnect preserves loopback origin, selected session, persona and completed file state without resubmitting work');
   writeFileSync(join(out,'report.json'),JSON.stringify({passed:true,mode:'offscreen native WebView2 CDP and headless WebKit; isolated DSH_HOME; no foreground activation or global input',checks,snapshots:images,consoleErrors},null,2));
   console.log('PekoPet UI checks passed: '+images.length+' screenshots');
 }catch(error){if(page){try{await snap(page,'failure');writeFileSync(join(out,'failure.html'),await page.content());}catch{}}
