@@ -34,10 +34,22 @@ jobs:
           ./scripts/import-sdk.ps1 -SdkPath local/sdk/CubismSdkForNative-5-r.5
       - name: Check native bridge before release optimization
         if: github.repository == 'entropy622/PekoPet' && github.event_name != 'pull_request'
-        run: cargo check -p pekopet --locked
+        shell: cmd
+        timeout-minutes: 5
+        run: |
+          cargo check -p pekopet --locked > native-check.log 2>&1
+          set result=%errorlevel%
+          type native-check.log
+          exit /b %result%
       - name: Build native portable candidate
         if: github.repository == 'entropy622/PekoPet' && github.event_name != 'pull_request'
-        run: npm run package:windows -- -DestinationPath dist/PekoPet-windows-x64
+        shell: cmd
+        timeout-minutes: 45
+        run: |
+          call npm run package:windows -- -DestinationPath dist/PekoPet-windows-x64 > portable-build.log 2>&1
+          set result=%errorlevel%
+          type portable-build.log
+          exit /b %result%
       - uses: actions/upload-artifact@v4
         if: github.repository == 'entropy622/PekoPet' && github.event_name != 'pull_request'
         with:
