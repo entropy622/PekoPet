@@ -15,6 +15,18 @@
       "layers": [],
       "excluded": ["shuiyin1", "shuiyin2", "danhair", "danhairL", "HAIR11", "HAIR2", "HAIR22", "HAIR3", "HAIR33", "hairR1", "Rhair"]
     },
+    "deepseek": {
+      "name": "DeepSeek-chan（大肥鱼）",
+      "author": "原画及拆分：神宫凉子；Live2D 建模：霓虹猫_NeonNeko",
+      "source": "local",
+      "model": "deepseek/DeepSeek/大肥鱼.model3.json",
+      "tracking": {"x":"AngleX","y":"AngleY"},
+      "portrait": {"scale":5.0,"y":-2.95},
+      "parameters": ["AngleX", "AngleY", "AngleZ", "PositionX", "PositionY", "PositionZ", "LeanInput"],
+      "excludedParameters": ["ParamAngleX", "ParamAngleY", "ParamAngleZ", "ParamBodyAngleX", "ParamBodyAngleY", "ParamBodyAngleZ"],
+      "layers": ["单片眼镜", "钢盆", "黑框眼镜", "前倾", "竖食指开", "兔牙", "尾巴开关"],
+      "excluded": ["默认体型", "体型1", "体型2", "裙子切换", "脱鞋", "胸口衣服", "竖食指关"]
+    },
     "ellen": {
       "name": "艾莲",
       "author": "神宫凉子 / 杨小唸",

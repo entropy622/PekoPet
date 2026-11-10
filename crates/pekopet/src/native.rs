@@ -42,6 +42,9 @@ unsafe extern "C" {
     fn peko_parameter_count(p: *mut c_void) -> i32;
     fn peko_parameter_id(p: *mut c_void, i: i32) -> *const c_char;
     fn peko_parameter_info(p: *mut c_void, i: i32, min: *mut f32, max: *mut f32, initial: *mut f32);
+    fn peko_advance(p: *mut c_void, dt: f32, gaze_x: f32, gaze_y: f32);
+    fn peko_portrait_view(p: *mut c_void, scale: f32, y: f32);
+    fn peko_tracking_parameters(p: *mut c_void, x: *const c_char, y: *const c_char);
     fn peko_reset_targets(p: *mut c_void);
     fn peko_cancel_motion(p: *mut c_void);
     fn peko_expression(p: *mut c_void, file: *const c_char, weight: f32) -> i32;
@@ -58,10 +61,8 @@ pub fn test_window(hwnd: isize) {
     unsafe { peko_test_window(hwnd) }
 }
 pub fn portrait_path(id: &str) -> PathBuf {
-    model_path(id)
-        .ancestors()
-        .nth(6)
-        .expect("Model cache root")
+    home()
+        .join("peko-pet")
         .join("icons")
         .join(format!("{id}-head.png"))
 }
@@ -122,7 +123,99 @@ pub fn render_portrait(id: &str) -> Result<PathBuf> {
     }
     let _guard = Handle(ptr);
     upload_textures(ptr, file.parent().unwrap())?;
+    configure_tracking(ptr, &avatar_metadata()["avatars"][id])?;
     save_portrait(ptr, id, 512)
+}
+/// Render a fixed character's discovered controls without showing a window or using dsh.
+pub fn check_avatar(id: &str, directory: &Path) -> Result<()> {
+    let metadata = avatar_metadata();
+    let avatar = &metadata["avatars"][id];
+    anyhow::ensure!(!avatar.is_null(), "Unknown avatar");
+    let file = model_path(id);
+    let name = c(&file.to_string_lossy())?;
+    let ptr = unsafe { peko_create_offscreen(name.as_ptr()) };
+    anyhow::ensure!(!ptr.is_null(), "{}", ffi_error());
+    let _guard = Handle(ptr);
+    upload_textures(ptr, file.parent().unwrap())?;
+    configure_tracking(ptr, avatar)?;
+    let mut expressions = BTreeMap::new();
+    let mut motions = BTreeMap::new();
+    discover(
+        file.parent().unwrap(),
+        &mut expressions,
+        &mut motions,
+        &names(&avatar["excluded"]),
+    )?;
+    let mut parameters = Vec::new();
+    for i in 0..unsafe { peko_parameter_count(ptr) } {
+        let id = unsafe { s(peko_parameter_id(ptr, i)) };
+        let (mut min, mut max, mut default) = (0., 0., 0.);
+        unsafe { peko_parameter_info(ptr, i, &mut min, &mut max, &mut default) };
+        parameters.push(json!({"id":id,"min":min,"max":max,"default":default,"controllable":allowed_parameter(&id,&metadata,avatar)}));
+    }
+    std::fs::create_dir_all(directory)?;
+    let mut frames = Vec::new();
+    let mut capture = |label: &str, gaze: (f32, f32)| -> Result<()> {
+        for _ in 0..90 {
+            unsafe { peko_advance(ptr, 1. / 60., gaze.0, gaze.1) };
+        }
+        let mut image = image::RgbaImage::new(512, 512);
+        anyhow::ensure!(
+            unsafe { peko_portrait(ptr, image.as_mut_ptr(), 512) } != 0,
+            "{}",
+            ffi_error()
+        );
+        let name = format!("{:02}.png", frames.len());
+        image.save(directory.join(&name))?;
+        frames.push(json!({"label":label,"image":name}));
+        Ok(())
+    };
+    capture("neutral", (0., 0.))?;
+    for (name, file) in &expressions {
+        unsafe { peko_reset_targets(ptr) };
+        let file = c(&file.to_string_lossy())?;
+        anyhow::ensure!(
+            unsafe { peko_expression(ptr, file.as_ptr(), 1.) } != 0,
+            "{}",
+            ffi_error()
+        );
+        capture(name, (0., 0.))?;
+    }
+    unsafe { peko_reset_targets(ptr) };
+    let layers = names(&avatar["layers"]);
+    for (_, file) in expressions
+        .iter()
+        .filter(|(name, _)| !layers.contains(*name))
+        .take(2)
+    {
+        let file = c(&file.to_string_lossy())?;
+        anyhow::ensure!(
+            unsafe { peko_expression(ptr, file.as_ptr(), 0.5) } != 0,
+            "{}",
+            ffi_error()
+        );
+    }
+    capture("mixed emotions", (0., 0.))?;
+    unsafe { peko_reset_targets(ptr) };
+    capture("released", (0., 0.))?;
+    capture("gaze right", (0.8, 0.3))?;
+    for (name, file) in &motions {
+        unsafe { peko_cancel_motion(ptr) };
+        let file = c(&file.to_string_lossy())?;
+        anyhow::ensure!(
+            unsafe { peko_motion(ptr, file.as_ptr()) } != 0,
+            "{}",
+            ffi_error()
+        );
+        capture(name, (0., 0.))?;
+    }
+    std::fs::write(
+        directory.join("report.json"),
+        serde_json::to_vec_pretty(
+            &json!({"avatar":id,"parameters":parameters,"frames":frames,"expressions":expressions.keys().collect::<Vec<_>>(),"layers":avatar["layers"],"motions":motions.keys().collect::<Vec<_>>()}),
+        )?,
+    )?;
+    Ok(())
 }
 fn c(s: &str) -> Result<CString> {
     Ok(CString::new(s)?)
@@ -197,10 +290,23 @@ fn names(value: &Value) -> BTreeSet<String> {
         .filter_map(|v| v.as_str().map(str::to_string))
         .collect()
 }
-fn allowed_parameter(id: &str, metadata: &Value) -> bool {
-    metadata["parameters"]
-        .as_array()
-        .is_some_and(|ids| ids.iter().any(|v| v.as_str() == Some(id)))
+fn allowed_parameter(id: &str, metadata: &Value, avatar: &Value) -> bool {
+    !names(&avatar["excludedParameters"]).contains(id)
+        && (names(&metadata["parameters"]).contains(id)
+            || names(&avatar["parameters"]).contains(id))
+}
+fn configure_tracking(ptr: *mut c_void, avatar: &Value) -> Result<()> {
+    let x = c(avatar["tracking"]["x"].as_str().unwrap_or("ParamAngleX"))?;
+    let y = c(avatar["tracking"]["y"].as_str().unwrap_or("ParamAngleY"))?;
+    unsafe {
+        peko_tracking_parameters(ptr, x.as_ptr(), y.as_ptr());
+        peko_portrait_view(
+            ptr,
+            avatar["portrait"]["scale"].as_f64().unwrap_or(3.6) as f32,
+            avatar["portrait"]["y"].as_f64().unwrap_or(-1.95) as f32,
+        );
+    };
+    Ok(())
 }
 fn rect(settings: &Value) -> Rect {
     Rect {
@@ -235,6 +341,8 @@ impl Native {
                 let mut motions = BTreeMap::new();
                 let metadata = avatar_metadata();
                 let id = settings["avatar"].as_str().unwrap_or("yumi");
+                let avatar = &metadata["avatars"][id];
+                configure_tracking(ptr, avatar)?;
                 let portrait = portrait_path(id);
                 if !portrait.exists() || !portrait.with_extension("ico").exists() {
                     save_portrait(ptr, id, 400)?;
@@ -242,7 +350,6 @@ impl Native {
                 let icon = c(&portrait.with_extension("ico").to_string_lossy())?;
                 unsafe { peko_tray_icon(ptr, icon.as_ptr()) };
                 events.send(json!({"native":"portrait","path":portrait}))?;
-                let avatar = &metadata["avatars"][id];
                 let excluded = names(&avatar["excluded"]);
                 let layers = names(&avatar["layers"]);
                 discover(base, &mut expressions, &mut motions, &excluded)?;
@@ -263,7 +370,7 @@ impl Native {
                 };
                 for i in 0..unsafe { peko_parameter_count(ptr) } {
                     let id = unsafe { s(peko_parameter_id(ptr, i)) };
-                    if !allowed_parameter(&id, &metadata) {
+                    if !allowed_parameter(&id, &metadata, avatar) {
                         continue;
                     }
                     let (mut min, mut max, mut default) = (0., 0., 0.);
@@ -419,14 +526,21 @@ impl Native {
     }
 }
 
-pub fn model_path(id: &str) -> PathBuf {
-    let home = std::env::var_os("DSH_HOME")
+fn home() -> PathBuf {
+    std::env::var_os("DSH_HOME")
         .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from(std::env::var_os("USERPROFILE").unwrap()).join(".dsh"));
+        .unwrap_or_else(|| PathBuf::from(std::env::var_os("USERPROFILE").unwrap()).join(".dsh"))
+}
+pub fn model_path(id: &str) -> PathBuf {
     let metadata = avatar_metadata();
     let relative = metadata["avatars"][id]["model"]
         .as_str()
         .expect("Known avatar id");
-    home.join("peko-pet/models/LLM_Live2D/public/live2D")
-        .join(relative)
+    if metadata["avatars"][id]["source"] == "local" {
+        crate::root().join("local/models").join(relative)
+    } else {
+        home()
+            .join("peko-pet/models/LLM_Live2D/public/live2D")
+            .join(relative)
+    }
 }

@@ -51,6 +51,15 @@ try{
     }
   }
   checks.push('minimal chat and on-demand settings at 720x760 and 600x620; bottom-docked composer, hidden workbench, decoded portrait, no horizontal overflow');
+  await tab(page,'角色调试');
+  const avatarPicker=page.getByRole('combobox',{name:'角色',exact:true});
+  assert.equal(await avatarPicker.locator('option[value=deepseek]').textContent(),'DeepSeek-chan（大肥鱼）');
+  if(existsSync(join(runtimeRoot,'local/models/deepseek/DeepSeek/大肥鱼.model3.json'))){
+    await avatarPicker.selectOption('deepseek');await until(async()=>(await invoke('peko_state')).settings.avatar==='deepseek');
+    await snap(page,'deepseek-character-selection');
+    await avatarPicker.selectOption('yumi');await until(async()=>(await invoke('peko_state')).settings.avatar==='yumi');
+    checks.push('locally imported DeepSeek-chan is selectable and persists through native settings RPC');
+  }
   await page.setViewportSize({width:720,height:760});await tab(page,'聊天与工作');
   await page.locator('.peko-more summary').click();await page.keyboard.press('Escape');assert.equal(await page.locator('.peko-more').getAttribute('open'),null);
   await page.locator('.peko-more summary').click();await page.locator('.peko-more-menu').getByRole('button',{name:'工作选项',exact:false}).click();await page.locator('[data-composer-modes]').waitFor({state:'visible'});await page.locator('[data-conversation-header]').waitFor({state:'visible'});await page.locator('[data-composer-standard-controls]').waitFor({state:'visible'});await snap(page,'chat-work-options');

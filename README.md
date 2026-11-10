@@ -26,6 +26,27 @@ npm run dev
 
 已有 clone 可运行 `git submodule update --init --recursive` 补齐 Framework。使用其他已有角色时运行 `npm run assets -- --all`。模型存入本机 DSH_HOME 下的缓存，保留原作者署名和使用说明。
 
+### 本机 DeepSeek-chan 模型
+
+使用作者提供的完整解压目录导入：
+
+```powershell
+node scripts/import-deepseek.mjs "C:/Users/你的用户名/Downloads/DeepSeek免费公皮"
+```
+
+导入后，在“更多选项 → 角色调试 → 角色”选择 **DeepSeek-chan（大肥鱼）**，退出托盘后重新启动。角色外观与人格分别设置。
+
+模型保存于项目的 `local/models/deepseek`，保留 DeepSeek 原目录、文件名和使用须知，不复制 PSD。原画及拆分：神宫凉子；Live2D 建模：霓虹猫_NeonNeko。附带须知禁止重新分发完整模型，因此这些资源不会提交到公开仓库，也不随便携包发布。换电脑后需自行取得原包并再次导入。
+
+模型开发时可用原生离屏检查入口，不显示桌宠或托盘，也不连接模型提供方：
+
+```powershell
+$env:PEKO_ROOT = (Get-Location).Path
+Start-Process ./target/release/pekopet.exe -ArgumentList '--check-avatar','deepseek','work/deepseek-native' -Wait -WindowStyle Hidden
+```
+
+输出包含各表情、持久层、动作、注视及回落截图，以及实际参数范围的 `report.json`。这些生成文件留在忽略的 `work` 目录。
+
 ### 双击启动
 
 源码目录准备好上述依赖后，双击根目录的 `start.bat`，自动缓存模型、增量构建并启动。脚本以自身所在目录为基准，移动项目目录后仍可使用，支持包含空格和中文的路径。

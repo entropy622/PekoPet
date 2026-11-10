@@ -15,3 +15,7 @@ PekoPet-authored code is MIT. The repository MIT license does not relicense thes
 Yumi is by Erara_艾拉拉. Ice Sugar and Ellen assets retain their creators' restrictions from the original LLM_Live2D repository. The asset setup script caches these models for local evaluation. They are not committed or included in the portable package. Portrait PNG/ICO files generated from them remain in the same local cache with attribution. A local build can use its cached Yumi icon; public CI uses the PekoPet-authored fallback icon.
 
 The Cubism Core importer retains its license and redistribution list. The official SDK download requires accepting Live2D's license agreements. Model-import expansion and public binary distribution require a release-license review separate from source-code development.
+
+## DeepSeek-chan local model
+
+DeepSeek-chan（大肥鱼）: original art and separation by 神宫凉子; Live2D modeling by 霓虹猫_NeonNeko. The supplied usage notice permits personal use and parameter adjustments and prohibits redistributing or reuploading the complete model. `scripts/import-deepseek.mjs` copies the runtime folder and its original usage notice into ignored `local/models/deepseek`, preserving their names. Model assets, thumbnails and derived portraits are excluded from the public repository and portable releases. The authoring PSD is not imported. This character's emotion catalog excludes clothing and body-shape controls.

@@ -1,6 +1,7 @@
 import React from 'react';
 import {createPortal} from 'react-dom';
 import {createSnapshotStore} from '@deepseek-ai/dsh-client-store';
+import avatarMetadata from '../../assets/avatars.json';
 const h=React.createElement,{useState,useEffect,useRef,useSyncExternalStore,useCallback}=React;
   const invoke=(command,args={})=>window.__TAURI__.core.invoke(command,args);
   const request=(method,params={})=>invoke('peko_request',{method,params});
@@ -43,7 +44,7 @@ const h=React.createElement,{useState,useEffect,useRef,useSyncExternalStore,useC
     const latency=state.latencies||[],sorted=[...latency].sort((a,b)=>a-b),p95=sorted.length?sorted[Math.ceil(sorted.length*.95)-1].toFixed(1)+' ms':'等待角色事件';
     return h('div',{className:'peko-panel-content'},
       h('header',null,h('h1',null,'让每个表情都刚刚好'),h('p',null,'表情可混合，姿势与道具会延续到明确关闭。')),
-      h(Card,null,h('div',{className:'peko-row'},h('h2',null,catalog.name||'正在加载角色'),h('label',null,'角色 ',h('select',{'aria-label':'角色',value:settings.avatar||'yumi',onChange:e=>update({avatar:e.target.value})},h('option',{value:'yumi'},'Yumi'),h('option',{value:'bingtang'},'冰糖'),h('option',{value:'ellen'},'艾莲')))),h('p',{className:'peko-meta'},'切换角色后重启应用生效。'),h('div',{className:'peko-grid'},(catalog.expressions||[]).map(name=>h('label',{key:name,className:'peko-range'},h('span',null,name),h('input',{type:'range',min:0,max:1,step:.05,value:mix[name]||0,'aria-label':name,onChange:e=>setMix({...mix,[name]:Number(e.target.value)})}),h('output',null,(mix[name]||0).toFixed(2))))),h(Button,{primary:true,onClick:()=>cue({mix,hold:2500})},'预览混合表情')),
+      h(Card,null,h('div',{className:'peko-row'},h('h2',null,catalog.name||'正在加载角色'),h('label',null,'角色 ',h('select',{'aria-label':'角色',value:settings.avatar||'yumi',onChange:e=>update({avatar:e.target.value})},Object.entries(avatarMetadata.avatars).map(([id,avatar])=>h('option',{key:id,value:id},avatar.name))))),h('p',{className:'peko-meta'},'切换角色后重启应用生效。'),h('div',{className:'peko-grid'},(catalog.expressions||[]).map(name=>h('label',{key:name,className:'peko-range'},h('span',null,name),h('input',{type:'range',min:0,max:1,step:.05,value:mix[name]||0,'aria-label':name,onChange:e=>setMix({...mix,[name]:Number(e.target.value)})}),h('output',null,(mix[name]||0).toFixed(2))))),h(Button,{primary:true,onClick:()=>cue({mix,hold:2500})},'预览混合表情')),
       h(Card,null,h('h2',null,'持续姿势与道具'),h('div',{className:'peko-actions'},(catalog.layers||[]).map(name=>{const active=state.avatarState?.layers?.[name]===true;return h(Button,{key:name,'aria-pressed':active,onClick:()=>cue({layers:{[name]:!active}})},name);}))),
       h(Card,null,h('h2',null,'动作'),h('div',{className:'peko-actions'},(catalog.motions||[]).map(name=>h(Button,{key:name,onClick:()=>cue({motion:name})},name)))),
       h(Card,null,h('h2',null,'模型参数'),h('div',{className:'peko-grid'},(catalog.parameters||[]).map(p=>h('label',{key:p.id,className:'peko-range'},h('span',null,p.id),h('input',{type:'range',min:p.min,max:p.max,step:(p.max-p.min)/100||.01,value:params[p.id]??p.default,'aria-label':p.id,onChange:e=>{const value=Number(e.target.value);setParams({...params,[p.id]:value});cue({params:{[p.id]:value},hold:1200});}}),h('output',null,(params[p.id]??p.default).toFixed(2)))))),

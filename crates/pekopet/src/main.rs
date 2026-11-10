@@ -188,7 +188,7 @@ impl Companion {
             .catalog
             .parameters
             .iter()
-            .find(|p| p.id == "ParamAngleZ")
+            .find(|p| p.id == "ParamAngleZ" || p.id == "AngleZ")
         {
             let offset = match status {
                 "thinking" => 6.,
@@ -505,6 +505,24 @@ fn root() -> PathBuf {
 fn main() {
     let root = root();
     let args: Vec<_> = std::env::args_os().collect();
+    if args.get(1).is_some_and(|s| s == "--check-avatar") {
+        let result = (|| -> anyhow::Result<()> {
+            let id = args
+                .get(2)
+                .and_then(|s| s.to_str())
+                .ok_or_else(|| anyhow::anyhow!("Supply an avatar id and output directory"))?;
+            let directory = args
+                .get(3)
+                .map(PathBuf::from)
+                .ok_or_else(|| anyhow::anyhow!("Supply an output directory"))?;
+            native::check_avatar(id, &directory)
+        })();
+        if let Err(error) = result {
+            eprintln!("{error:#}");
+            std::process::exit(1);
+        }
+        return;
+    }
     if args.get(1).is_some_and(|s| s == "--render-portrait") {
         match native::render_portrait(args.get(2).and_then(|s| s.to_str()).unwrap_or("yumi")) {
             Ok(file) => println!("{}", file.display()),

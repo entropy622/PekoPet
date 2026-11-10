@@ -1,7 +1,8 @@
 import { DatabaseSync } from 'node:sqlite';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync, existsSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
+const avatars=JSON.parse(readFileSync(new URL('../assets/avatars.json',import.meta.url),'utf8')).avatars;
 
 export const defaultSettings = {
   persona: '你是 Peko，用户的桌面搭档。默认用中文，温暖、俏皮、自然。日常可以开玩笑；工作时简洁直接，准确汇报操作、结果和故障。尊重用户的独处时间，不编造共同经历。',
@@ -43,7 +44,8 @@ export class State {
       next[key] = value;
     }
     if (next.persona.length > 12000 || next.idleMinutes < 1 || next.idleMinutes > 1440 || next.activeStart < 0 || next.activeEnd > 24 || next.activeStart >= next.activeEnd || next.maxDailyGreetings < 0 || next.maxDailyGreetings > 20 || next.petScale < 0.1 || next.petScale > 4) throw new Error('设置超出范围');
-    if(!['yumi','bingtang','ellen'].includes(next.avatar))throw new Error('角色必须选自固定目录');
+    if(!Object.hasOwn(avatars,next.avatar))throw new Error('角色必须选自固定目录');
+    if(patch.avatar&&avatars[next.avatar].source==='local'&&!existsSync(new URL('../local/models/'+avatars[next.avatar].model,import.meta.url)))throw new Error('请先导入本机模型：node scripts/import-deepseek.mjs "模型压缩包解压目录"');
     this.db.prepare('INSERT OR REPLACE INTO settings VALUES(1,?)').run(JSON.stringify(next)); return next;
   }
   memories() { return this.db.prepare('SELECT id,text,source_session AS sourceSession,source_seq AS sourceSeq,created FROM memories ORDER BY created').all(); }

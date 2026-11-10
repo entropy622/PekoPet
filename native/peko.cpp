@@ -13,6 +13,8 @@
 #include <filesystem>
 #include <fstream>
 #include <map>
+#include <set>
+#include <cstdio>
 #include <memory>
 #include <vector>
 #include <string>
@@ -37,6 +39,7 @@
 #include <Physics/CubismPhysics.hpp>
 #include <Effect/CubismPose.hpp>
 #include <Rendering/D3D11/CubismRenderer_D3D11.hpp>
+#include <Rendering/D3D11/CubismDeviceInfo_D3D11.hpp>
 
 using namespace Live2D::Cubism::Framework;
 using namespace Live2D::Cubism::Framework::Rendering;
@@ -52,6 +55,7 @@ struct Allocator:ICubismAllocator{
     void DeallocateAligned(void* p)override{_aligned_free(p);}
 };
 static Allocator allocator;
+static void cubismLog(const char* message){std::fputs(message,stderr);std::fflush(stderr);}
 static csmByte* loadShader(const std::string file,csmSizeInt* size){
     const unsigned char* source=nullptr;
     if(file=="FrameworkShaders/CubismEffect.fx"){source=PEKO_EFFECT_SHADER;*size=sizeof(PEKO_EFFECT_SHADER);}
@@ -73,6 +77,7 @@ public:
         csmVector<CubismBreath::BreathParameterData> bp;
         bp.PushBack({CubismFramework::GetIdManager()->GetId("ParamBreath"),0.5f,0.5f,3.2f,1.0f});_breath->SetParameters(bp);
         csmMap<csmString,csmFloat32> layout;setting->GetLayoutMap(layout);_modelMatrix->SetupFromLayout(layout);
+        if(_physics)_physics->Stabilization(_model);
         _model->SaveParameters();
     }
     void motion(const fs::path& file){auto b=bytes(file);auto m=LoadMotion(b.data(),(csmSizeInt)b.size(),"peko");if(!m)throw std::runtime_error("Cannot load motion");_motionManager->StartMotionPriority(m,true,3);}
@@ -81,7 +86,7 @@ public:
         _model->LoadParameters();_motionManager->UpdateMotion(_model,dt);_model->SaveParameters();
         if(_eyeBlink)_eyeBlink->UpdateParameters(_model,dt);if(_breath)_breath->UpdateParameters(_model,dt);
         auto id=CubismFramework::GetIdManager();
-        _model->AddParameterValue(id->GetId("ParamAngleX"),gazeX*15);_model->AddParameterValue(id->GetId("ParamAngleY"),gazeY*10);
+        _model->AddParameterValue(id->GetId(trackingX.c_str()),gazeX*15);_model->AddParameterValue(id->GetId(trackingY.c_str()),gazeY*10);
         _model->SetParameterValue(id->GetId("ParamEyeBallX"),gazeX);_model->SetParameterValue(id->GetId("ParamEyeBallY"),gazeY);
         float ease=1.0f-std::exp(-dt/0.12f);
         struct Blend{float add=0,multiply=1,overwrite=0,weight=0;};
@@ -104,12 +109,14 @@ public:
     struct Param{float value=0,target=0,weight=0;};
     std::map<std::string,Expr> expressions;
     std::map<std::string,Param> parameters;
+    std::string trackingX="ParamAngleX",trackingY="ParamAngleY";
     std::unique_ptr<CubismModelSettingJson> setting;
     fs::path base;
     ~Model(){for(auto& [k,e]:expressions)ACubismMotion::Delete(e.motion);}
 };
 
 struct Pet{
+    float portraitScale=3.6f,portraitY=-1.95f;
     HWND hwnd=nullptr;PekoRect state{};POINT drag{},start{};bool dragging=false,moved=false;int events=0;
     ComPtr<ID3D11Device> device;ComPtr<ID3D11DeviceContext> context;ComPtr<IDXGISwapChain1> swap;
     ComPtr<ID3D11RenderTargetView> target;ComPtr<IDCompositionDevice> composition;ComPtr<IDCompositionTarget> compTarget;ComPtr<IDCompositionVisual> visual;
@@ -176,9 +183,16 @@ struct Pet{
         check(factory->CreateSwapChainForComposition(device.Get(),&desc,nullptr,&swap),"CreateSwapChainForComposition");
         ComPtr<ID3D11Texture2D> buffer;check(swap->GetBuffer(0,IID_PPV_ARGS(&buffer)),"GetBuffer");check(device->CreateRenderTargetView(buffer.Get(),nullptr,&target),"CreateRenderTargetView");
         check(DCompositionCreateDevice(dxgi.Get(),IID_PPV_ARGS(&composition)),"DCompositionCreateDevice");check(composition->CreateTargetForHwnd(hwnd,TRUE,&compTarget),"CreateTargetForHwnd");check(composition->CreateVisual(&visual),"CreateVisual");check(visual->SetContent(swap.Get()),"SetContent");check(compTarget->SetRoot(visual.Get()),"SetRoot");check(composition->Commit(),"Commit");
-        option.LoggingLevel=CubismFramework::Option::LogLevel_Off;option.LoadFileFunction=loadShader;option.ReleaseBytesFunction=releaseShader;
+        option.LoggingLevel=CubismFramework::Option::LogLevel_Warning;option.LogFunction=cubismLog;option.LoadFileFunction=loadShader;option.ReleaseBytesFunction=releaseShader;
         if(!CubismFramework::StartUp(&allocator,&option))throw std::runtime_error("Cubism startup failed");CubismFramework::Initialize();frameworkStarted=true;
-        CubismRenderer_D3D11::SetConstantSettings(2,device.Get());model=std::make_unique<Model>();model->load(path(file));model->CreateRenderer(state.width,state.height);
+        model=std::make_unique<Model>();model->load(path(file));
+        auto nativeModel=model->GetModel();std::set<std::vector<int>> maskGroups;
+        auto masks=nativeModel->GetDrawableMasks();auto counts=nativeModel->GetDrawableMaskCounts();
+        for(int i=0;i<nativeModel->GetDrawableCount();++i)if(counts[i]){std::vector<int> group(masks[i],masks[i]+counts[i]);std::sort(group.begin(),group.end());maskGroups.insert(std::move(group));}
+        // Cubism packs 36 groups into one mask texture, or 32 per texture with multiple buffers.
+        int buffers=maskGroups.size()<=36?1:(int)(maskGroups.size()+31)/32;
+        CubismRenderer_D3D11::SetConstantSettings(buffers,device.Get());model->CreateRenderer(state.width,state.height,buffers);
+        std::fprintf(stderr,"Cubism: %d drawables, %zu clipping groups, %d buffers\n",nativeModel->GetDrawableCount(),maskGroups.size(),buffers);
         textures.resize(model->setting->GetTextureCount());
         if(!offline){tray.cbSize=sizeof(tray);tray.hWnd=hwnd;tray.uID=1;tray.uFlags=NIF_MESSAGE|NIF_ICON|NIF_TIP;tray.uCallbackMessage=WM_APP+1;tray.hIcon=LoadIconW(nullptr,IDI_APPLICATION);wcscpy_s(tray.szTip,L"PekoPet · Ctrl+Alt+P");Shell_NotifyIconW(NIM_ADD,&tray);
         RegisterHotKey(hwnd,1,MOD_CONTROL|MOD_ALT|MOD_NOREPEAT,'P');RegisterHotKey(hwnd,2,MOD_CONTROL|MOD_ALT|MOD_SHIFT|MOD_NOREPEAT,'P');place();events|=4;}
@@ -191,13 +205,14 @@ struct Pet{
         int viewWidth=headshot?std::min(state.width,state.height):state.width,viewHeight=headshot?viewWidth:state.height;
         D3D11_VIEWPORT vp{0,0,(float)viewWidth,(float)viewHeight,0,1};context->RSSetViewports(1,&vp);
         auto renderer=model->GetRenderer<CubismRenderer_D3D11>();renderer->StartFrame(context.Get());
-        CubismMatrix44 projection;projection.Scale(headshot?3.6f:(float)state.height/state.width*state.scale*.925f,headshot?3.6f:state.scale*.925f);projection.MultiplyByMatrix(model->GetModelMatrix());if(headshot)projection.TranslateY(-1.95f);renderer->SetMvpMatrix(&projection);renderer->IsPremultipliedAlpha(false);renderer->DrawModel();renderer->EndFrame();if(!headshot)check(swap->Present(1,0),"Present");
+        CubismMatrix44 projection;projection.Scale(headshot?portraitScale:(float)state.height/state.width*state.scale*.925f,headshot?portraitScale:state.scale*.925f);projection.MultiplyByMatrix(model->GetModelMatrix());if(headshot)projection.TranslateY(portraitY);renderer->SetMvpMatrix(&projection);renderer->IsPremultipliedAlpha(false);renderer->DrawModel();renderer->EndFrame();if(!headshot)check(swap->Present(1,0),"Present");
     }
     ~Pet(){
         if(!offline)Shell_NotifyIconW(NIM_DELETE,&tray);if(portraitIcon)peko_release_icon(portraitIcon);
         if(hwnd&&!offline){UnregisterHotKey(hwnd,1);UnregisterHotKey(hwnd,2);}
         model.reset();
-        if(frameworkStarted){CubismRenderer::StaticRelease();CubismFramework::Dispose();CubismFramework::CleanUp();}
+        // The SDK device cache owns Cubism allocations and must be freed before its allocator.
+        if(frameworkStarted){CubismDeviceInfo_D3D11::ReleaseAllDeviceInfo();CubismRenderer::StaticRelease();CubismFramework::Dispose();CubismFramework::CleanUp();}
         visual.Reset();compTarget.Reset();composition.Reset();target.Reset();swap.Reset();textures.clear();context.Reset();device.Reset();
         if(hwnd)DestroyWindow(hwnd);
         if(comStarted)CoUninitialize();
@@ -227,6 +242,9 @@ int peko_parameter_count(void* p){return ((Pet*)p)->model->GetModel()->GetParame
 const char* peko_parameter_id(void* p,int i){return ((Pet*)p)->model->GetModel()->GetParameterId(i)->GetString().GetRawString();}
 void peko_parameter_info(void* p,int i,float* lo,float* hi,float* initial){auto m=((Pet*)p)->model->GetModel();*lo=m->GetParameterMinimumValue(i);*hi=m->GetParameterMaximumValue(i);*initial=m->GetParameterDefaultValue(i);}
 void peko_reset_targets(void* p){auto m=((Pet*)p)->model.get();for(auto& [k,e]:m->expressions)e.target=0;for(auto& [k,e]:m->parameters)e.target=0;}
+void peko_advance(void* p,float dt,float gazeX,float gazeY){((Pet*)p)->model->update(dt,gazeX,gazeY);}
+void peko_portrait_view(void* p,float scale,float y){((Pet*)p)->portraitScale=scale;((Pet*)p)->portraitY=y;}
+void peko_tracking_parameters(void* p,const char* x,const char* y){auto m=((Pet*)p)->model.get();m->trackingX=x;m->trackingY=y;}
 void peko_cancel_motion(void* p){((Pet*)p)->model->cancel();}
 int peko_expression(void* p,const char* file,float weight){try{auto m=((Pet*)p)->model.get();auto it=m->expressions.find(file);if(it==m->expressions.end()){auto b=bytes(path(file));auto motion=CubismExpressionMotion::Create(b.data(),(csmSizeInt)b.size());if(!motion)throw std::runtime_error("Expression load failed");it=m->expressions.emplace(file,Model::Expr{motion}).first;}it->second.target=weight;return 1;}catch(const std::exception& e){last_error=e.what();return 0;}}
 void peko_parameter(void* p,const char* id,float value){auto& e=((Pet*)p)->model->parameters[id];e.value=value;e.target=1;}

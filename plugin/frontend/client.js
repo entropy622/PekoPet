@@ -39,6 +39,48 @@ module.exports = __toCommonJS(client_source_exports);
 var import_react = __toESM(require("react"), 1);
 var import_react_dom = require("react-dom");
 var import_dsh_client_store = require("@deepseek-ai/dsh-client-store");
+
+// assets/avatars.json
+var avatars_default = {
+  parameters: ["ParamAngleX", "ParamAngleY", "ParamAngleZ", "ParamBodyAngleX", "ParamBodyAngleY", "ParamBodyAngleZ", "ParamEyeLOpen", "ParamEyeROpen", "ParamEyeBallX", "ParamEyeBallY", "ParamBrowLY", "ParamBrowRY", "ParamBrowLAngle", "ParamBrowRAngle", "ParamMouthOpenY", "ParamMouthForm", "ParamCheek", "ParamBreath"],
+  avatars: {
+    yumi: {
+      name: "Yumi",
+      author: "Erara_\u827E\u62C9\u62C9",
+      model: "yumi/yumi.model3.json",
+      layers: ["\u62FF\u8BDD\u7B52", "\u62AC\u624B\u53F3", "\u62AC\u624B\u5DE6", "\u4FEF\u8EAB\u6309\u952E", "\u6F02\u6D6E\u5C0F\u72D7", "\u773C\u7F69"],
+      excluded: ["\u77ED\u53D11", "\u77ED\u53D12"]
+    },
+    bingtang: {
+      name: "\u51B0\u7CD6",
+      author: "\u795E\u5BAB\u51C9\u5B50",
+      model: "\u514D\u8D39\u6A21\u578B\u51B0\u7CD6/\u514D\u8D39\u6A21\u578B\u51B0\u7CD6.model3.json",
+      layers: [],
+      excluded: ["shuiyin1", "shuiyin2", "danhair", "danhairL", "HAIR11", "HAIR2", "HAIR22", "HAIR3", "HAIR33", "hairR1", "Rhair"]
+    },
+    deepseek: {
+      name: "DeepSeek-chan\uFF08\u5927\u80A5\u9C7C\uFF09",
+      author: "\u539F\u753B\u53CA\u62C6\u5206\uFF1A\u795E\u5BAB\u51C9\u5B50\uFF1BLive2D \u5EFA\u6A21\uFF1A\u9713\u8679\u732B_NeonNeko",
+      source: "local",
+      model: "deepseek/DeepSeek/\u5927\u80A5\u9C7C.model3.json",
+      tracking: { x: "AngleX", y: "AngleY" },
+      portrait: { scale: 5, y: -2.95 },
+      parameters: ["AngleX", "AngleY", "AngleZ", "PositionX", "PositionY", "PositionZ", "LeanInput"],
+      excludedParameters: ["ParamAngleX", "ParamAngleY", "ParamAngleZ", "ParamBodyAngleX", "ParamBodyAngleY", "ParamBodyAngleZ"],
+      layers: ["\u5355\u7247\u773C\u955C", "\u94A2\u76C6", "\u9ED1\u6846\u773C\u955C", "\u524D\u503E", "\u7AD6\u98DF\u6307\u5F00", "\u5154\u7259", "\u5C3E\u5DF4\u5F00\u5173"],
+      excluded: ["\u9ED8\u8BA4\u4F53\u578B", "\u4F53\u578B1", "\u4F53\u578B2", "\u88D9\u5B50\u5207\u6362", "\u8131\u978B", "\u80F8\u53E3\u8863\u670D", "\u7AD6\u98DF\u6307\u5173"]
+    },
+    ellen: {
+      name: "\u827E\u83B2",
+      author: "\u795E\u5BAB\u51C9\u5B50 / \u6768\u5C0F\u5538",
+      model: "\u514D\u8D39\u6A21\u578B\u827E\u83B2/\u514D\u8D39\u6A21\u578B\u827E\u83B2.model3.json",
+      layers: [],
+      excluded: ["shuiyin"]
+    }
+  }
+};
+
+// plugin/frontend/client.source.jsx
 var import_jsx_runtime = require("react/jsx-runtime");
 var h = import_react.default.createElement;
 var { useState, useEffect, useRef, useSyncExternalStore, useCallback } = import_react.default;
@@ -137,7 +179,7 @@ function CompanionPanel({ tab, state, run, onChat }) {
     "div",
     { className: "peko-panel-content" },
     h("header", null, h("h1", null, "\u8BA9\u6BCF\u4E2A\u8868\u60C5\u90FD\u521A\u521A\u597D"), h("p", null, "\u8868\u60C5\u53EF\u6DF7\u5408\uFF0C\u59FF\u52BF\u4E0E\u9053\u5177\u4F1A\u5EF6\u7EED\u5230\u660E\u786E\u5173\u95ED\u3002")),
-    h(Card, null, h("div", { className: "peko-row" }, h("h2", null, catalog.name || "\u6B63\u5728\u52A0\u8F7D\u89D2\u8272"), h("label", null, "\u89D2\u8272 ", h("select", { "aria-label": "\u89D2\u8272", value: settings.avatar || "yumi", onChange: (e) => update({ avatar: e.target.value }) }, h("option", { value: "yumi" }, "Yumi"), h("option", { value: "bingtang" }, "\u51B0\u7CD6"), h("option", { value: "ellen" }, "\u827E\u83B2")))), h("p", { className: "peko-meta" }, "\u5207\u6362\u89D2\u8272\u540E\u91CD\u542F\u5E94\u7528\u751F\u6548\u3002"), h("div", { className: "peko-grid" }, (catalog.expressions || []).map((name) => h("label", { key: name, className: "peko-range" }, h("span", null, name), h("input", { type: "range", min: 0, max: 1, step: 0.05, value: mix[name] || 0, "aria-label": name, onChange: (e) => setMix({ ...mix, [name]: Number(e.target.value) }) }), h("output", null, (mix[name] || 0).toFixed(2))))), h(Button, { primary: true, onClick: () => cue({ mix, hold: 2500 }) }, "\u9884\u89C8\u6DF7\u5408\u8868\u60C5")),
+    h(Card, null, h("div", { className: "peko-row" }, h("h2", null, catalog.name || "\u6B63\u5728\u52A0\u8F7D\u89D2\u8272"), h("label", null, "\u89D2\u8272 ", h("select", { "aria-label": "\u89D2\u8272", value: settings.avatar || "yumi", onChange: (e) => update({ avatar: e.target.value }) }, Object.entries(avatars_default.avatars).map(([id, avatar]) => h("option", { key: id, value: id }, avatar.name))))), h("p", { className: "peko-meta" }, "\u5207\u6362\u89D2\u8272\u540E\u91CD\u542F\u5E94\u7528\u751F\u6548\u3002"), h("div", { className: "peko-grid" }, (catalog.expressions || []).map((name) => h("label", { key: name, className: "peko-range" }, h("span", null, name), h("input", { type: "range", min: 0, max: 1, step: 0.05, value: mix[name] || 0, "aria-label": name, onChange: (e) => setMix({ ...mix, [name]: Number(e.target.value) }) }), h("output", null, (mix[name] || 0).toFixed(2))))), h(Button, { primary: true, onClick: () => cue({ mix, hold: 2500 }) }, "\u9884\u89C8\u6DF7\u5408\u8868\u60C5")),
     h(Card, null, h("h2", null, "\u6301\u7EED\u59FF\u52BF\u4E0E\u9053\u5177"), h("div", { className: "peko-actions" }, (catalog.layers || []).map((name) => {
       const active = state.avatarState?.layers?.[name] === true;
       return h(Button, { key: name, "aria-pressed": active, onClick: () => cue({ layers: { [name]: !active } }) }, name);

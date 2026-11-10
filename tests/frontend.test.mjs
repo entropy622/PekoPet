@@ -57,3 +57,9 @@ test('vendored chat and composer share the browser runtime and own their CSS lif
     assert.ok(text.includes('return result;'));
   }
 });
+
+test('character picker is built from the shared avatar metadata',()=>{
+  const source=readFileSync('plugin/frontend/client.source.jsx','utf8');
+  assert.ok(source.includes('Object.entries(avatarMetadata.avatars).map'));
+  assert.ok(readFileSync('plugin/frontend/client.js','utf8').includes('DeepSeek-chan'));
+});
