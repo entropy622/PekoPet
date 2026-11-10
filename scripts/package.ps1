@@ -39,7 +39,7 @@ try{
     }
   }
   $metadata.packages|Select-Object name,version,license,repository|ConvertTo-Json|Set-Content -Encoding utf8 (Join-Path $licenses 'rust-dependencies.json')
-  Compress-Archive -Path $destination -DestinationPath ($destination+'.zip') -CompressionLevel Fastest
+  & (Join-Path $PSScriptRoot 'archive.ps1') -Source $destination -Destination ($destination+'.zip')
   Write-Output "便携目录：$destination"
   Write-Output "ZIP：$destination.zip"
 }finally{Pop-Location}
