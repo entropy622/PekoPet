@@ -29,6 +29,7 @@ struct Rect {
     positioned: i32,
 }
 unsafe extern "C" {
+    fn peko_reduced_motion() -> i32;
     fn peko_create(path: *const c_char, state: Rect) -> *mut c_void;
     fn peko_destroy(p: *mut c_void);
     fn peko_error() -> *const c_char;
@@ -51,6 +52,13 @@ unsafe extern "C" {
     fn peko_show_chat(hwnd: isize, show: i32);
     fn peko_show_chat_quiet(hwnd: isize);
     fn peko_notify(p: *mut c_void, message: *const c_char);
+}
+pub fn reduced_motion() -> bool {
+    static REDUCED: std::sync::LazyLock<bool> = std::sync::LazyLock::new(|| {
+        std::env::var_os("PEKO_REDUCED_MOTION").is_some_and(|v| v == "1")
+            || unsafe { peko_reduced_motion() != 0 }
+    });
+    *REDUCED
 }
 fn c(s: &str) -> Result<CString> {
     Ok(CString::new(s)?)

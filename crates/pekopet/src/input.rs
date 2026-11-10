@@ -1,4 +1,5 @@
 // Adapted from GPUI 0.2.2 input example. Copyright Zed Industries. Apache-2.0.
+use crate::ui;
 use peko_core::text::utf16_to_utf8;
 use std::ops::Range;
 
@@ -337,7 +338,7 @@ impl EntityInputHandler for TextInput {
             .map(|selected| {
                 utf16_to_utf8(new_text, selected.start)..utf16_to_utf8(new_text, selected.end)
             })
-            .map(|new_range| new_range.start + range.start..new_range.end + range.end)
+            .map(|new_range| new_range.start + range.start..new_range.end + range.start)
             .unwrap_or_else(|| range.start + new_text.len()..range.start + new_text.len());
 
         cx.notify();
@@ -439,7 +440,7 @@ impl Element for TextElement {
         let style = window.text_style();
 
         let (display_text, text_color) = if content.is_empty() {
-            (input.placeholder.clone(), rgb(0x93a5b7).into())
+            (input.placeholder.clone(), rgb(ui::MUTED).into())
         } else {
             (content, style.color)
         };
@@ -514,7 +515,7 @@ impl Element for TextElement {
                         point(left + cursor_pos, bounds.top()),
                         size(px(2.), bounds.bottom() - bounds.top()),
                     ),
-                    rgb(0xffb9a5),
+                    rgb(ui::PRIMARY),
                 )),
             )
         } else {
@@ -524,7 +525,7 @@ impl Element for TextElement {
                         point(left + line.x_for_index(selected_range.start), bounds.top()),
                         point(left + line.x_for_index(selected_range.end), bounds.bottom()),
                     ),
-                    rgba(0x8cb6c750),
+                    rgba(0x6366f133),
                 )),
                 None,
             )
@@ -586,7 +587,7 @@ impl Render for TextInput {
             .w_full()
             .min_w_0()
             .overflow_hidden()
-            .rounded_md()
+            .rounded(px(16.))
             .key_context("TextInput")
             .track_focus(&self.focus_handle(cx))
             .cursor(CursorStyle::IBeam)
@@ -607,15 +608,32 @@ impl Render for TextInput {
             .on_mouse_up(MouseButton::Left, cx.listener(Self::on_mouse_up))
             .on_mouse_up_out(MouseButton::Left, cx.listener(Self::on_mouse_up))
             .on_mouse_move(cx.listener(Self::on_mouse_move))
-            .bg(rgb(0x29333f))
-            .text_color(rgb(0xe8eef3))
+            .bg(rgb(ui::CANVAS))
+            .text_color(rgb(ui::INK))
+            .focus(|s| {
+                s.bg(rgb(ui::CLOUD)).shadow(vec![
+                    gpui::BoxShadow {
+                        color: rgba(0x6366f133).into(),
+                        offset: point(px(0.), px(0.)),
+                        blur_radius: px(0.),
+                        spread_radius: px(4.),
+                    },
+                    gpui::BoxShadow {
+                        color: rgba(0x6366f124).into(),
+                        offset: point(px(0.), px(10.)),
+                        blur_radius: px(26.),
+                        spread_radius: px(0.),
+                    },
+                ])
+            })
             .line_height(px(24.))
             .text_size(px(16.))
             .child(
                 div()
-                    .h(px(40.))
+                    .h(px(52.))
                     .w_full()
-                    .p(px(8.))
+                    .px(px(20.))
+                    .py(px(14.))
                     .child(TextElement { input: cx.entity() }),
             )
     }

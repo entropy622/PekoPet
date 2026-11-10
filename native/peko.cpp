@@ -201,6 +201,7 @@ struct Pet{
 };
 
 extern "C" {
+int peko_reduced_motion(){BOOL enabled=TRUE;SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION,0,&enabled,0);return !enabled;}
 const char* peko_error(){return last_error.c_str();}
 void* peko_create(const char* file,PekoRect state){try{auto p=std::make_unique<Pet>();p->state=state;p->init(file);return p.release();}catch(const std::exception& e){last_error=e.what();return nullptr;}}
 void peko_destroy(void* p){delete(Pet*)p;}
