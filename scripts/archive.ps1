@@ -8,7 +8,7 @@ $prefix=(Split-Path $sourcePath -Leaf)+'/'
 $archive=[IO.Compression.ZipFile]::Open($destinationPath,[IO.Compression.ZipArchiveMode]::Create)
 try{
   foreach($item in Get-ChildItem -LiteralPath $sourcePath -Force){
-    if($item.Name -in @('work','runtime')){continue}
+    if($item.Name -in @('work','runtime','local','peko-pet','.env','.credentials.yaml')){continue}
     $files=if($item.PSIsContainer){[IO.Directory]::EnumerateFiles($item.FullName,'*',[IO.SearchOption]::AllDirectories)}else{@($item.FullName)}
     foreach($file in $files){
       $relative=$file.Substring($sourcePath.Length+1).Replace('\','/')

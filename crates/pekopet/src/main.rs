@@ -42,10 +42,10 @@ async fn peko_request(
     bridge
         .tx
         .send(Control::Request(method, params, tx))
-        .map_err(|_| "dsh 连接已关闭")?;
+        .map_err(|_| "助手运行时已停止")?;
     tauri::async_runtime::spawn_blocking(move || {
         rx.recv_timeout(Duration::from_secs(60))
-            .map_err(|_| "dsh 请求超时，请重新连接".to_string())?
+            .map_err(|_| "助手请求超时，请重新加载配置".to_string())?
     })
     .await
     .map_err(|e| e.to_string())?
@@ -76,7 +76,7 @@ async fn peko_cue(cue: Cue, bridge: tauri::State<'_, Bridge>) -> Result<Value, S
     .map_err(|e| e.to_string())?
 }
 #[tauri::command]
-fn peko_reconnect(bridge: tauri::State<'_, Bridge>) -> Result<(), String> {
+fn peko_reload_config(bridge: tauri::State<'_, Bridge>) -> Result<(), String> {
     bridge
         .tx
         .send(Control::Reconnect)
@@ -147,11 +147,11 @@ impl Companion {
             let id = rpc.call(method, p);
             self.pending.insert(id, reply);
         } else if let Pending::Frontend(answer) = reply {
-            let _ = answer.send(Err("dsh 尚未连接".into()));
+            let _ = answer.send(Err("助手尚未就绪".into()));
         }
     }
     fn publish(&self) {
-        let value = json!({"status":self.status,"error":self.error,"connected":self.rpc.is_some()&&self.origin.lock().unwrap().is_some(),"settings":self.settings,"catalog":self.catalog,"avatarState":self.avatar_state,"home":self.home,"profile":"desktop → peko","sessionId":self.session,"busy":self.busy,"latencies":self.latencies,"firstTokenMs":self.first_token});
+        let value = json!({"status":self.status,"error":self.error,"connected":self.rpc.is_some()&&self.origin.lock().unwrap().is_some(),"settings":self.settings,"catalog":self.catalog,"avatarState":self.avatar_state,"home":self.home,"runtime":"PekoPet","sessionId":self.session,"busy":self.busy,"latencies":self.latencies,"firstTokenMs":self.first_token});
         let mut current = self.snapshot.lock().unwrap();
         if *current == value {
             return;
@@ -165,14 +165,14 @@ impl Companion {
         self.rpc.take();
         for (_, pending) in self.pending.drain() {
             if let Pending::Frontend(answer) = pending {
-                let _ = answer.send(Err("dsh 已重新连接，未重发操作".into()));
+                let _ = answer.send(Err("配置已重新加载，未重发操作".into()));
             }
         }
         *self.origin.lock().unwrap() = None;
         self.busy = false;
         self.parsers.clear();
         self.command(Command::Cancel, None);
-        self.status = "正在连接 dsh".into();
+        self.status = "正在启动助手".into();
         self.error.clear();
         match rpc::Rpc::start(self.root.clone(), self.events.clone(), self.generation) {
             Ok(rpc) => {
@@ -296,7 +296,7 @@ impl Companion {
         if let Some(error) = e["transportError"].as_str() {
             self.error = error.into();
             *self.origin.lock().unwrap() = None;
-            self.status = "连接已断开".into();
+            self.status = "助手运行时已停止".into();
             self.busy = false;
             self.parsers.clear();
             self.command(Command::Cancel, None);
@@ -355,10 +355,10 @@ impl Companion {
                                 }
                                 self.status = "在你身边".into();
                             }
-                            _ => self.error = "dsh 前端未提供有效的本机地址".into(),
+                            _ => self.error = "助手界面未提供有效的本机地址".into(),
                         }
                     } else {
-                        self.error = "dsh 未启用嵌入式前端".into();
+                        self.error = "助手界面未启动".into();
                     }
                 }
                 Pending::Activate(id) => {
@@ -481,7 +481,7 @@ impl Companion {
                     self.command(Command::Notify("提醒到了，点我查看。"), None);
                 }
             }
-            "peko.error" => self.error = p["message"].as_str().unwrap_or("dsh 故障").into(),
+            "peko.error" => self.error = p["message"].as_str().unwrap_or("助手运行时故障").into(),
             _ => {}
         }
         self.publish();
@@ -534,7 +534,7 @@ fn main() {
         return;
     }
     let (tx, rx) = mpsc::channel();
-    let snapshot = Arc::new(Mutex::new(json!({"status":"正在连接 dsh"})));
+    let snapshot = Arc::new(Mutex::new(json!({"status":"正在启动助手"})));
     let shared = snapshot.clone();
     let control = tx.clone();
     let origin = Arc::new(Mutex::new(None::<String>));
@@ -543,7 +543,7 @@ fn main() {
     let worker: Arc<Mutex<Option<thread::JoinHandle<()>>>> = Arc::new(Mutex::new(None));
     let setup_worker = worker.clone();
     let app=tauri::Builder::default().plugin(tauri_plugin_opener::Builder::new().open_js_links_on_click(false).build()).manage(Bridge{tx,snapshot})
-        .invoke_handler(tauri::generate_handler![peko_request,peko_state,peko_activate,peko_cue,peko_reconnect,window_action])
+        .invoke_handler(tauri::generate_handler![peko_request,peko_state,peko_activate,peko_cue,peko_reload_config,window_action])
         .setup(move|app|{
             let opener=app.handle().clone();
             let mut builder=tauri::WebviewWindowBuilder::new(app,"main",tauri::WebviewUrl::App("index.html".into()))

@@ -18,7 +18,7 @@ for(const extension of ['png','ico','json']){const source=join(process.env.DSH_H
 const port=await new Promise(resolve=>{const server=createServer();server.listen(0,'127.0.0.1',()=>{const port=server.address().port;server.close(()=>resolve(port));});});
 const runtimeRoot=process.env.PEKO_UI_ROOT?resolve(process.env.PEKO_UI_ROOT):root;
 const executable=process.env.PEKO_UI_EXE||join(root,'target/debug/pekopet.exe');
-const app=spawn(executable,[],{cwd:runtimeRoot,windowsHide:true,env:{...process.env,PEKO_ROOT:runtimeRoot,PEKO_NODE:existsSync(join(runtimeRoot,'node.exe'))?join(runtimeRoot,'node.exe'):process.execPath,DSH_HOME:home,PEKO_UI_TEST:'1',PEKO_UI_CHECK_PORT:String(port),PEKO_DSH_PATCH:patch,PEKO_UI_FIXTURE_CATALOG:catalog},stdio:['ignore','pipe','pipe']});
+const app=spawn(executable,[],{cwd:runtimeRoot,windowsHide:true,env:{...process.env,PEKO_ROOT:runtimeRoot,PEKO_NODE:existsSync(join(runtimeRoot,'node.exe'))?join(runtimeRoot,'node.exe'):process.execPath,DSH_HOME:home,PEKO_UI_TEST:'1',PEKO_UI_CHECK_PORT:String(port),PEKO_AGENT_PATCH:patch,PEKO_UI_FIXTURE_CATALOG:catalog},stdio:['ignore','pipe','pipe']});
 let stderr='';app.stderr.on('data',v=>stderr+=v);const exited=new Promise(r=>app.once('exit',r));
 writeFileSync(join(out,'process.json'),JSON.stringify({pid:app.pid,home,port,executable},null,2));
 let browser,page,other,reconnecting=false;const consoleErrors=[],images=[],checks=[];
@@ -42,7 +42,7 @@ try{
   const invoke=(command,args={})=>page.evaluate(({command,args})=>window.__TAURI__.core.invoke(command,args),{command,args});
   for(const size of [{width:720,height:760},{width:600,height:620}]){
     await page.setViewportSize(size);
-    for(const [name,label]of [['chat','聊天与工作'],['memory','共同记忆'],['persona','相处方式'],['models','模型与连接'],['avatar','角色调试']]){
+    for(const [name,label]of [['chat','聊天与工作'],['memory','共同记忆'],['persona','相处方式'],['models','模型与配置'],['avatar','角色调试']]){
       await tab(page,label);
       if(name!=='chat'){const heading=page.locator('.peko-panel-content h1');await heading.waitFor();assert.ok((await heading.boundingBox()).y>=52,'Heading under titlebar at '+name);}else {await page.locator('[contenteditable=true]').first().waitFor();assert.equal(await page.locator('[data-slot=sidebar]').isVisible(),false);assert.equal(await page.locator('[data-composer-modes]').isVisible(),false);await page.locator('[data-conversation-header]').waitFor({state:'attached'});assert.equal(await page.locator('[data-conversation-header]').isVisible(),false);assert.equal(await page.locator('[data-composer-standard-controls]').isVisible(),false);assert.equal(await page.locator('[data-composer-dock]').isVisible(),false);const card=await page.locator('[data-composer-card]').boundingBox();assert.ok(card.y>size.height/2,'Composer should sit at the bottom');const sendButton=page.getByRole('button',{name:'发送',exact:true});if(await sendButton.count())assert.ok((await sendButton.boundingBox()).y+32<=size.height,'Composer outside window');}
       await page.locator('.peko-titlebar img').evaluate(image=>image.decode());
@@ -98,7 +98,7 @@ try{
   await snap(wk,'webkit-chat');await tab(wk,'相处方式');await wk.getByRole('textbox',{name:'人格',exact:true}).waitFor();await snap(wk,'webkit-persona');checks.push('WebKit renders the same frontend and navigates React panes, using the test native bridge');
   assert.deepEqual(consoleErrors.filter(e=>!e.includes('503')),[], 'Browser errors');
   await other.close();other=null;
-  reconnecting=true;const navigation=page.waitForEvent('domcontentloaded',{timeout:180000});await invoke('peko_reconnect');await navigation;await page.waitForSelector('[data-peko-ready]',{timeout:180000});reconnecting=false;
+  reconnecting=true;const navigation=page.waitForEvent('domcontentloaded',{timeout:180000});await invoke('peko_reload_config');await navigation;await page.waitForSelector('[data-peko-ready]',{timeout:180000});reconnecting=false;
   assert.equal(new URL(page.url()).origin,new URL(url).origin,'Stable local origin');await page.getByText('你好，我是 Peko。',{exact:true}).first().waitFor();await until(async()=>(await invoke('peko_state')).sessionId===selected.sessionId);assert.equal((await invoke('peko_state')).settings.persona,'你是离屏测试的 Peko，工作时简洁直接。');assert.equal(readFileSync(join(project,'fixture.txt'),'utf8'),'after');checks.push('reconnect preserves loopback origin, selected session, persona and completed file state without resubmitting work');
   writeFileSync(join(out,'report.json'),JSON.stringify({passed:true,mode:'offscreen native WebView2 CDP and headless WebKit; isolated DSH_HOME; no foreground activation or global input',checks,snapshots:images,consoleErrors},null,2));
   console.log('PekoPet UI checks passed: '+images.length+' screenshots');

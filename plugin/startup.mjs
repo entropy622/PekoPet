@@ -1,10 +1,9 @@
-import { exitOnStdinEnd } from '@deepseek-ai/dsh-cmdline';
 import {createServer} from 'node:net';
 import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
 import {join} from 'node:path';
 import {homedir} from 'node:os';
 export const name='peko-startup';
-export const inject=['cmdlineArgs'];
+export const inject=[];
 async function frontendPort(){
   const directory=join(process.env.DSH_HOME||join(homedir(),'.dsh'),'peko-pet');
   const file=join(directory,'web-port');
@@ -21,8 +20,7 @@ async function frontendPort(){
 }
 /** Keep one loopback origin so dsh's browser preferences survive reconnects. */
 export async function apply(ctx){
-  exitOnStdinEnd(ctx,'peko.stdin');
+  if(process.env.PEKO_EMBEDDED_UI!=='1')return;
   const port=await frontendPort();
-  ctx.provide('sdkAppStartup',{accepted:true});
   ctx.provide('webStartup',{host:'127.0.0.1',port,openBrowser:false,trustedHosts:[]});
 }

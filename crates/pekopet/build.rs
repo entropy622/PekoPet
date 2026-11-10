@@ -32,7 +32,7 @@ fn main() {
                 "peko_state",
                 "peko_activate",
                 "peko_cue",
-                "peko_reconnect",
+                "peko_reload_config",
                 "window_action",
             ]))
             .windows_attributes(tauri_build::WindowsAttributes::new().window_icon_path(icon)),

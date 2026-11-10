@@ -11,7 +11,7 @@ try{
   if((Test-Path -LiteralPath $destination) -and -not $Resume){throw "输出目录已存在：$destination"}
   New-Item -ItemType Directory -Force $destination|Out-Null
   Copy-Item -LiteralPath 'target/release/pekopet.exe','package.json','package-lock.json','start.bat','LICENSE','THIRD_PARTY.md','README.md' -Destination $destination
-  foreach($folder in @('plugin','scripts','assets','node_modules')){
+  foreach($folder in @('agent','plugin','scripts','assets','node_modules')){
     & robocopy (Join-Path $root $folder) (Join-Path $destination $folder) /E /XJ /MT:16 /R:2 /W:1 /NFL /NDL /NJH /NJS /NP
     if($LASTEXITCODE -gt 7){throw "复制 $folder 失败"}
   }
@@ -21,6 +21,8 @@ try{
       if($LASTEXITCODE -gt 7){throw "复制 dsh React 前端失败：$fork"}
     }
   }
+  & robocopy (Join-Path $root 'vendor/peko-agent-loop') (Join-Path $destination 'vendor/peko-agent-loop') /E /MT:16 /R:2 /W:1 /NFL /NDL /NJH /NJS /NP
+  if($LASTEXITCODE -gt 7){throw '复制 PekoPet agent loop 失败'}
   $node=(Get-Command node.exe).Source
   Copy-Item -LiteralPath $node -Destination (Join-Path $destination 'node.exe')
   $nodeLicense=Join-Path (Split-Path $node -Parent) 'LICENSE'

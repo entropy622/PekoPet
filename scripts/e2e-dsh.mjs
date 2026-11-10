@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 const sessionId=`peko-e2e-${randomUUID()}`,cwd=resolve('work/e2e');mkdirSync(cwd,{recursive:true});
-const child=spawn(process.execPath,['scripts/launch-dsh.mjs'],{stdio:['pipe','pipe','pipe'],windowsHide:true});
+const child=spawn(process.execPath,['scripts/start-agent.mjs'],{stdio:['pipe','pipe','pipe'],windowsHide:true});
 let next=1,stderr='',streamed=false,final=false,failed=false,steps=0,originalSettings;
 const pending=new Map();
 function call(method,params){const id=next++;child.stdin.write(JSON.stringify({jsonrpc:'2.0',id,method,params})+'\n');return new Promise((resolve,reject)=>pending.set(id,{resolve,reject}));}
@@ -22,7 +22,7 @@ try{
   const caps=await call('peko.capabilities',{});
   originalSettings=caps.settings;
   const choice=process.env.PEKO_TEST_PROVIDER?{provider:process.env.PEKO_TEST_PROVIDER,model:process.env.PEKO_TEST_MODEL}:caps.defaultModel;
-  if(!choice?.provider||!choice?.model)throw new Error('dsh desktop 没有默认模型');
+  if(!choice?.provider||!choice?.model)throw new Error('共享配置没有默认模型');
   await call('initialize',{cwd,provider:choice.provider,model:choice.model,maxTokens:512});
   await call('peko.settings',{patch:{memoryEnabled:false,proactive:false}});
   await call('session/prompt',{sessionId,contentBlocks:[{type:'text',text:'这是 PekoPet 的短测试。只回复“你好，我是 Peko。”，在正文前加上 [[peko:{"mix":{"星星眼":0.8},"hold":1000}]]。不要调用工具。'}],avatar:{name:'Yumi',expressions:['星星眼'],layers:[],motions:['wave'],parameters:[]}});

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-peko-reload-config"
+description = "Enables the peko_reload_config command without any pre-configured scope."
+commands.allow = ["peko_reload_config"]
+
+[[permission]]
+identifier = "deny-peko-reload-config"
+description = "Denies the peko_reload_config command without any pre-configured scope."
+commands.deny = ["peko_reload_config"]

@@ -1,0 +1,5 @@
+# Runtime sources
+
+The application boot, shared configuration reader/editor, session migration and runtime composition are PekoPet code. SessionController adapts dsh-sdk-jsonrpc-server server.js; settings.mjs adapts dsh-settings. Both originate from DeepSeek Harness 0.2.1-alpha.4, commit 86a402200d95fecef4529d969836f1fe13c6cb0d, under the retained MIT LICENSE. SessionController is an internal application service, with no SDK server plugin; settings has no profileContext and never renames or imports shared legacy configuration. composition.yml is a pinned, application-owned composition derived from the same release's base/web/preset declarations. PekoPet selects its local loop and owns policy, persistence, frontends and process lifetime; only model, MCP and skill configuration is read from the shared home.
+
+The preset declaration adapter pins scoped module resolution to the installed application without storing absolute component paths in user configuration. Shared preset configuration is filtered to skill and MCP entries. Migration hands off only owned reminders before activating the local scheduler.

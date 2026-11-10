@@ -28,7 +28,7 @@
             "allow-peko-state",
             "allow-peko-activate",
             "allow-peko-cue",
-            "allow-peko-reconnect",
+            "allow-peko-reload-config",
             "allow-window-action"
           ]
         }

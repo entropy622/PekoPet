@@ -37,9 +37,9 @@ const h=React.createElement,{useState,useEffect,useRef,useSyncExternalStore,useC
       h(Card,null,h('div',{className:'peko-row'},h('div',null,h('h2',null,'主动陪伴'),h('p',null,'仅在设定时段问候，不观察屏幕或前台应用。')),h(Button,{'aria-pressed':!!settings.proactive,onClick:()=>update({proactive:!settings.proactive})},settings.proactive?'已开启':'已关闭')),
         h('div',{className:'peko-grid'},h(Field,{label:'空闲多少分钟后问候',type:'number',min:15,max:1440,value:settings.idleMinutes||60,onChange:e=>update({idleMinutes:Number(e.target.value)})}),h(Field,{label:'每日最多问候次数',type:'number',min:0,max:10,value:settings.maxDailyGreetings??2,onChange:e=>update({maxDailyGreetings:Number(e.target.value)})}),h(Field,{label:'开始时间（本地小时）',type:'number',min:0,max:23,value:settings.activeStart??9,onChange:e=>update({activeStart:Number(e.target.value)})}),h(Field,{label:'结束时间（本地小时）',type:'number',min:1,max:24,value:settings.activeEnd??22,onChange:e=>update({activeEnd:Number(e.target.value)})}))));
     if(tab==='models')return h('div',{className:'peko-panel-content'},
-      h('header',null,h('h1',null,'模型与连接'),h('p',null,'模型、工具与凭据继续复用 dsh。')),
-      h(Card,null,h('h2',null,'共享 dsh 配置'),h('dl',null,h('dt',null,'DSH_HOME'),h('dd',null,state.home||'正在连接'),h('dt',null,'Profile'),h('dd',null,state.profile||'desktop → peko'),h('dt',null,'连接状态'),h('dd',null,state.connected?'已连接':'连接已断开')),h('div',{className:'peko-actions'},h(Button,{primary:true,onClick:()=>run(()=>invoke('peko_reconnect'))},'重新连接 dsh'),h(Button,{onClick:onChat},'选择聊天模型'))),
-      h(Card,null,h('h2',null,'修改配置后重新连接'),h('p',null,'继续使用原有 desktop 配置目录、MCP、skills 与凭据。重新连接会恢复界面，不会重复提交工作操作。')),
+      h('header',null,h('h1',null,'模型与配置'),h('p',null,'助手由 PekoPet 运行，共享模型、MCP 与 skills 配置。')),
+      h(Card,null,h('h2',null,'共享 dsh 配置'),h('dl',null,h('dt',null,'DSH_HOME'),h('dd',null,state.home||'正在读取'),h('dt',null,'运行时'),h('dd',null,'PekoPet'),h('dt',null,'状态'),h('dd',null,state.connected?'已就绪':'启动中')),h('div',{className:'peko-actions'},h(Button,{primary:true,disabled:state.busy,onClick:()=>run(()=>invoke('peko_reload_config'))},'重新加载配置'),h(Button,{onClick:onChat},'选择聊天模型'))),
+      h(Card,null,h('h2',null,'共享配置'),h('p',null,'读取 dsh 目录中的模型提供方、MCP 与 skills。会话、工具循环、记忆和提醒由 PekoPet 管理。外部配置变更后可在空闲时重新加载。')),
       h(Button,{className:'peko-danger',onClick:()=>invoke('window_action',{action:'exit'})},'退出 PekoPet'));
     const latency=state.latencies||[],sorted=[...latency].sort((a,b)=>a-b),p95=sorted.length?sorted[Math.ceil(sorted.length*.95)-1].toFixed(1)+' ms':'等待角色事件';
     return h('div',{className:'peko-panel-content'},
@@ -59,7 +59,7 @@ const h=React.createElement,{useState,useEffect,useRef,useSyncExternalStore,useC
     const run=async(action,message='')=>{setError('');setNotice('');try{await action();setNotice(message);}catch(e){setError(String(e));}};
     return {state,error,notice,run};
   }
-const sections=[['memory','共同记忆'],['persona','相处方式'],['models','模型与连接'],['avatar','角色调试']];
+const sections=[['memory','共同记忆'],['persona','相处方式'],['models','模型与配置'],['avatar','角色调试']];
 function useSnapshot(source){
   const subscribe=useCallback(listener=>source.subscribe(listener),[source]);
   const read=useCallback(()=>source.getSnapshot(),[source]);

@@ -7,7 +7,7 @@ import { resolve } from 'node:path';
 
 const cwd=resolve('work/real-work-'+randomUUID());mkdirSync(cwd,{recursive:true});
 writeFileSync(resolve(cwd,'fixture.txt'),'before\n');
-const child=spawn(process.execPath,['scripts/launch-dsh.mjs'],{stdio:['pipe','pipe','pipe'],windowsHide:true});
+const child=spawn(process.execPath,['scripts/start-agent.mjs'],{stdio:['pipe','pipe','pipe'],windowsHide:true});
 const exited=new Promise(r=>child.once('exit',r));
 const events=[],pending=new Map();let next=1,stderr='',settings,activeSession;
 child.stderr.on('data',data=>stderr+=data);

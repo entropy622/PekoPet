@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync,mkdtempSync,rmSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {parse} from 'yaml';
-import {prepareOverlay} from '../scripts/prepare-overlay.mjs';
+import {prepareRuntime} from '../agent/configuration.mjs';
 import {runInNewContext} from 'node:vm';
 import {visibleText} from '../plugin/frontend/text.mjs';
 function module(){let result;runInNewContext(readFileSync('plugin/frontend/client.js','utf8'),{document:{title:''},window:{__ModuleLoader__:{load:row=>{result=row.factory(name=>name==='@deepseek-ai/dsh-client-store'?{createSnapshotStore:value=>({getSnapshot:()=>value,set:next=>{value=next;},subscribe:()=>()=>{}})}:{useEffect:fn=>fn(),createElement:(component,props,...children)=>({component,props,children})});}}}});return result;}
@@ -37,8 +37,8 @@ test('PekoPet keeps settings on demand and preserves dsh chat ownership',()=>{
 
 test('embedded overlay removes upstream branding and feedback without disabling model settings',t=>{
   const root=mkdtempSync(resolve('work/overlay-test-'));t.after(()=>rmSync(root,{recursive:true}));
-  const rows=parse(readFileSync(prepareOverlay(root,true),'utf8'));
-  for(const id of ['ui-brand-official','ui-message-feedback','ui-settings-account','command-feedback'])assert.equal(rows.find(row=>row.id===id)?.disabled,true);
+  const rows=prepareRuntime(root,{embedded:true}).rows;
+  for(const id of ['ui-brand-official','ui-message-feedback','ui-settings-account','command-feedback'])assert.equal(rows.some(row=>row.id===id&&!row.disabled),false);
   for(const id of ['ui-settings-models','ui-model-selection','ui-approval','ui-user-questions'])assert.equal(rows.some(row=>row.id===id&&row.disabled),false);
 });
 

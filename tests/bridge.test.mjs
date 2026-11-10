@@ -2,17 +2,19 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
-import { mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync,realpathSync } from 'node:fs';
+import { mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync,realpathSync,renameSync,readdirSync,existsSync } from 'node:fs';
 import { join,resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
-test('real dsh loop shares MCP and skills, streams, remembers, approves, asks and cancels without an API key',{timeout:180000},async t=>{
+test('owned loop shares MCP and skills, streams, remembers, approves, asks and cancels without an API key',{timeout:180000},async t=>{
   const home=mkdtempSync(join(tmpdir(),'peko-bridge-')),desktop=join(home,'profiles/desktop');mkdirSync(desktop,{recursive:true});
   writeFileSync(join(desktop,'package.json'),JSON.stringify({dsh:{profile:{bundles:['@deepseek-ai/dsh-base','@deepseek-ai/dsh-web-app']}}}));
   writeFileSync(join(desktop,'cordis.patch.yml'),`- id: llm-deepseek-account\n  disabled: true\n- insert:\n    - id: test-mcp\n      name: '@deepseek-ai/dsh-mcp-client'\n      config:\n        serverName: fixture\n        transport: stdio\n        command: ${JSON.stringify(process.execPath)}\n        args: [${JSON.stringify(resolve('tests/mcp-server.mjs'))}]\n`);
   const skill=join(home,'skills/peko-fixture');mkdirSync(skill,{recursive:true});writeFileSync(join(skill,'SKILL.md'),'---\nname: peko-fixture\ndescription: Fixture skill for the shared dsh home\n---\nUse this skill during the PekoPet test.\n');
+  const custom=join(home,'custom-skills/peko-custom-fixture');mkdirSync(custom,{recursive:true});writeFileSync(join(custom,'SKILL.md'),'---\nname: peko-custom-fixture\ndescription: Fixture from a shared custom skill root\n---\nUse the configured custom root.\n');
+  const desktopPatch=join(desktop,'cordis.patch.yml');writeFileSync(desktopPatch,readFileSync(desktopPatch,'utf8')+`- id: skill-filesystem\n  config:\n    customSkillDirs: [${JSON.stringify(join(home,'custom-skills'))}]\n`);
   const patch=join(home,'replay.yml');writeFileSync(patch,`- insert:\n    - id: peko-test-adapter\n      name: '${pathToFileURL(resolve('tests/replay-adapter.mjs')).href}'\n`);
-  const start=()=>spawn(process.execPath,['scripts/launch-dsh.mjs','--patch',patch],{env:{...process.env,DSH_HOME:home},windowsHide:true,stdio:['pipe','pipe','pipe']});
+  const start=()=>spawn(process.execPath,['scripts/start-agent.mjs','--patch',patch],{env:{...process.env,DSH_HOME:home},windowsHide:true,stdio:['pipe','pipe','pipe']});
   let child=start();
   let stderr='',next=1,ready=false;const pending=new Map(),events=[];child.stderr.on('data',b=>stderr+=b);
   let exited=new Promise(r=>child.once('exit',r));
@@ -20,7 +22,7 @@ test('real dsh loop shares MCP and skills, streams, remembers, approves, asks an
   const attach=()=>createInterface({input:child.stdout}).on('line',line=>{try{const f=JSON.parse(line);events.push(f);if(f.id){const p=pending.get(f.id);if(p){ready=true;pending.delete(f.id);f.error?p.reject(new Error(f.error.message)):p.resolve(f.result);}}}catch(e){stderr+=e.message;}});attach();
   const call=(method,params={})=>{const id=next++;return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{pending.delete(id);reject(new Error(`RPC timeout: ${method}; exit=${child.exitCode}; events=${events.length}\n${stderr}`));},method==='peko.capabilities'&&!ready?120000:20000);pending.set(id,{resolve:value=>{clearTimeout(timer);resolve(value);},reject:error=>{clearTimeout(timer);reject(error);}});child.stdin.write(JSON.stringify({jsonrpc:'2.0',id,method,params})+'\n');});};
   async function until(predicate){for(let i=0;i<400;i++){const e=events.find(predicate);if(e)return e;if(child.exitCode!==null)throw new Error(stderr);await new Promise(r=>setTimeout(r,25));}throw new Error(`event timeout\n${stderr}`);}
-  const caps=await call('peko.capabilities');assert.equal(caps.sharedProfile,'desktop');assert.ok(caps.providers.some(p=>p.id==='peko-test'));
+  const caps=await call('peko.capabilities');assert.equal(caps.runtime.loopOwner,'PekoPet');assert.equal(caps.runtime.owner,'PekoPet');assert.equal(caps.sharedProfile,'desktop');assert.ok(caps.providers.some(p=>p.id==='peko-test'));
   await call('initialize',{cwd:home,provider:'peko-test',model:'replay'});
   assert.equal((await call('peko.settings')).provider,'');
   const project=join(home,'project');mkdirSync(project);
@@ -30,7 +32,7 @@ test('real dsh loop shares MCP and skills, streams, remembers, approves, asks an
   assert.ok(events.some(e=>e.method==='peko.stream'&&e.params.frame.type==='chunk'));
   const history=await call('peko.history',{sessionId:'root'});assert.equal(history.messages[0].text,'我喜欢兔子');assert.ok(history.messages.at(-1).text.includes('[[peko:'));
   await call('session/prompt',{sessionId:'root',contentBlocks:[{type:'text',text:'avatar-context-check'}]});await call('session/wait',{sessionId:'root'});
-  const inventory=await call('peko.capabilities',{sessionId:'root'});assert.ok(inventory.tools.some(t=>t.name==='mcp__fixture__echo'));assert.ok(inventory.skills.skills.some(s=>s.name==='peko-fixture'));
+  const inventory=await call('peko.capabilities',{sessionId:'root'});assert.ok(inventory.tools.some(t=>t.name==='mcp__fixture__echo'));assert.ok(inventory.skills.skills.some(s=>s.name==='peko-fixture'));assert.ok(inventory.skills.skills.some(s=>s.name==='peko-custom-fixture'));
   await until(e=>e.method==='peko.memory.changed');const memories=await call('peko.memory');assert.equal(memories.memories[0].text,'用户喜欢兔子');
   await call('peko.memory',{action:'delete',id:memories.memories[0].id});assert.equal((await call('peko.memory')).memories.length,0);
   for(const text of ['我喜欢 Rust','我喜欢 GPUI']){
@@ -65,9 +67,17 @@ test('real dsh loop shares MCP and skills, streams, remembers, approves, asks an
   await call('peko.avatar',{sessionId:'root',state:{layers:{'拿话筒':true}}});
   await call('peko.memory',{action:'add',text:'用户喜欢 Rust'});
   await call('peko.settings',{patch:{memoryEnabled:false}});
+  await call('session/prompt',{sessionId:'pending-reminder',contentBlocks:[{type:'text',text:'schedule-later'}]});await call('session/wait',{sessionId:'pending-reminder'});
   await call('shutdown');await exited;assert.equal(child.exitCode,0,stderr);
+  for(const folder of ['sessions','storages']){const from=resolve(home,'peko-pet',folder),to=resolve(home,folder);assert.ok(from.startsWith(home)&&to.startsWith(home));renameSync(from,to);}
+  rmSync(join(home,'peko-pet/session-migration.json'));
+  const legacyInventory=()=>Object.fromEntries(readdirSync(join(home,'sessions'),{recursive:true,withFileTypes:true}).filter(e=>e.isFile()).map(e=>{const p=join(e.parentPath,e.name);return[p.slice(home.length),readFileSync(p).toString('base64')];}));
+  const legacy=legacyInventory();
+  const tasks=directory=>{const single=join(directory,'schedule.json');if(existsSync(single))return Object.values(JSON.parse(readFileSync(single,'utf8')).tables.tasks);return readdirSync(join(directory,'schedule/tasks')).map(name=>JSON.parse(readFileSync(join(directory,'schedule/tasks',name),'utf8')).record);};
   const beforeRestart=events.length;ready=false;child=start();child.stderr.on('data',b=>stderr+=b);exited=new Promise(r=>child.once('exit',r));attach();
   await call('peko.capabilities');await call('initialize',{cwd:home,provider:'peko-test',model:'replay'});
+  assert.equal(tasks(join(home,'storages')).find(t=>t.sessionId==='pending-reminder').status,'inactive');
+  assert.equal(tasks(join(home,'peko-pet/storages')).find(t=>t.sessionId==='pending-reminder').status,'active');
   await call('peko.open',{sessionId:'root'});
   assert.equal(realpathSync.native((await call('session/working-directory/get',{sessionId:'root'})).cwd),realpathSync.native(project));
   const restored=await call('peko.history',{sessionId:'root'});assert.equal(restored.messages[0].text,'我喜欢兔子');assert.deepEqual(restored.avatarState,{layers:{'拿话筒':true}});
@@ -76,5 +86,6 @@ test('real dsh loop shares MCP and skills, streams, remembers, approves, asks an
   assert.equal(events.slice(beforeRestart).some(e=>e.method==='peko.stream'),false);
   await call('session/prompt',{sessionId:'root',contentBlocks:[{type:'text',text:'继续聊天'}]});await call('session/wait',{sessionId:'root'});
   assert.ok((await call('peko.history',{sessionId:'root'})).messages.some(m=>m.text==='继续聊天'));
+  assert.deepEqual(legacyInventory(),legacy);
   await call('shutdown');await exited;assert.equal(child.exitCode,0,stderr);
 });

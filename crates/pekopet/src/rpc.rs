@@ -31,7 +31,7 @@ impl Rpc {
         let stderr = OpenOptions::new()
             .create(true)
             .append(true)
-            .open(logdir.join("dsh.log"))?;
+            .open(logdir.join("agent.log"))?;
         let node = std::env::var_os("PEKO_NODE").unwrap_or_else(|| {
             if root.join("node.exe").exists() {
                 root.join("node.exe").into_os_string()
@@ -40,7 +40,7 @@ impl Rpc {
             }
         });
         let mut child = Command::new(node)
-            .arg(root.join("scripts/launch-dsh.mjs"))
+            .arg(root.join("scripts/start-agent.mjs"))
             .current_dir(&root)
             .env("PEKO_EMBEDDED_UI", "1")
             .stdin(Stdio::piped())
@@ -48,7 +48,7 @@ impl Rpc {
             .stderr(stderr)
             .creation_flags(0x08000000)
             .spawn()
-            .context("启动 dsh 失败，请安装 Node.js 24 并运行 npm install")?;
+            .context("启动 PekoPet agent 失败，请安装 Node.js 24 并运行 npm install")?;
         let mut stdin = child.stdin.take().unwrap();
         let stdout = child.stdout.take().unwrap();
         let (tx, rx) = mpsc::channel::<Value>();
@@ -80,7 +80,7 @@ impl Rpc {
                         }
                         Err(e) => {
                             let _ = events.send(
-                                json!({"transportError":format!("dsh 输出了非协议内容: {e}"),"connectionGeneration":generation}),
+                                json!({"transportError":format!("Agent 运行时输出了非协议内容: {e}"),"connectionGeneration":generation}),
                             );
                             break;
                         }
@@ -91,7 +91,7 @@ impl Rpc {
                     }
                 }
             }
-            let _ = events.send(json!({"transportError":"dsh 连接已关闭，未自动重发任务","connectionGeneration":generation}));
+            let _ = events.send(json!({"transportError":"Agent 运行时已停止，未自动重发任务","connectionGeneration":generation}));
         });
         Ok(Self {
             writer: tx,

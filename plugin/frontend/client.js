@@ -169,9 +169,9 @@ function CompanionPanel({ tab, state, run, onChat }) {
   if (tab === "models") return h(
     "div",
     { className: "peko-panel-content" },
-    h("header", null, h("h1", null, "\u6A21\u578B\u4E0E\u8FDE\u63A5"), h("p", null, "\u6A21\u578B\u3001\u5DE5\u5177\u4E0E\u51ED\u636E\u7EE7\u7EED\u590D\u7528 dsh\u3002")),
-    h(Card, null, h("h2", null, "\u5171\u4EAB dsh \u914D\u7F6E"), h("dl", null, h("dt", null, "DSH_HOME"), h("dd", null, state.home || "\u6B63\u5728\u8FDE\u63A5"), h("dt", null, "Profile"), h("dd", null, state.profile || "desktop \u2192 peko"), h("dt", null, "\u8FDE\u63A5\u72B6\u6001"), h("dd", null, state.connected ? "\u5DF2\u8FDE\u63A5" : "\u8FDE\u63A5\u5DF2\u65AD\u5F00")), h("div", { className: "peko-actions" }, h(Button, { primary: true, onClick: () => run(() => invoke("peko_reconnect")) }, "\u91CD\u65B0\u8FDE\u63A5 dsh"), h(Button, { onClick: onChat }, "\u9009\u62E9\u804A\u5929\u6A21\u578B"))),
-    h(Card, null, h("h2", null, "\u4FEE\u6539\u914D\u7F6E\u540E\u91CD\u65B0\u8FDE\u63A5"), h("p", null, "\u7EE7\u7EED\u4F7F\u7528\u539F\u6709 desktop \u914D\u7F6E\u76EE\u5F55\u3001MCP\u3001skills \u4E0E\u51ED\u636E\u3002\u91CD\u65B0\u8FDE\u63A5\u4F1A\u6062\u590D\u754C\u9762\uFF0C\u4E0D\u4F1A\u91CD\u590D\u63D0\u4EA4\u5DE5\u4F5C\u64CD\u4F5C\u3002")),
+    h("header", null, h("h1", null, "\u6A21\u578B\u4E0E\u914D\u7F6E"), h("p", null, "\u52A9\u624B\u7531 PekoPet \u8FD0\u884C\uFF0C\u5171\u4EAB\u6A21\u578B\u3001MCP \u4E0E skills \u914D\u7F6E\u3002")),
+    h(Card, null, h("h2", null, "\u5171\u4EAB dsh \u914D\u7F6E"), h("dl", null, h("dt", null, "DSH_HOME"), h("dd", null, state.home || "\u6B63\u5728\u8BFB\u53D6"), h("dt", null, "\u8FD0\u884C\u65F6"), h("dd", null, "PekoPet"), h("dt", null, "\u72B6\u6001"), h("dd", null, state.connected ? "\u5DF2\u5C31\u7EEA" : "\u542F\u52A8\u4E2D")), h("div", { className: "peko-actions" }, h(Button, { primary: true, disabled: state.busy, onClick: () => run(() => invoke("peko_reload_config")) }, "\u91CD\u65B0\u52A0\u8F7D\u914D\u7F6E"), h(Button, { onClick: onChat }, "\u9009\u62E9\u804A\u5929\u6A21\u578B"))),
+    h(Card, null, h("h2", null, "\u5171\u4EAB\u914D\u7F6E"), h("p", null, "\u8BFB\u53D6 dsh \u76EE\u5F55\u4E2D\u7684\u6A21\u578B\u63D0\u4F9B\u65B9\u3001MCP \u4E0E skills\u3002\u4F1A\u8BDD\u3001\u5DE5\u5177\u5FAA\u73AF\u3001\u8BB0\u5FC6\u548C\u63D0\u9192\u7531 PekoPet \u7BA1\u7406\u3002\u5916\u90E8\u914D\u7F6E\u53D8\u66F4\u540E\u53EF\u5728\u7A7A\u95F2\u65F6\u91CD\u65B0\u52A0\u8F7D\u3002")),
     h(Button, { className: "peko-danger", onClick: () => invoke("window_action", { action: "exit" }) }, "\u9000\u51FA PekoPet")
   );
   const latency = state.latencies || [], sorted = [...latency].sort((a, b) => a - b), p95 = sorted.length ? sorted[Math.ceil(sorted.length * 0.95) - 1].toFixed(1) + " ms" : "\u7B49\u5F85\u89D2\u8272\u4E8B\u4EF6";
@@ -226,7 +226,7 @@ function useNativeState() {
   };
   return { state, error, notice, run };
 }
-var sections = [["memory", "\u5171\u540C\u8BB0\u5FC6"], ["persona", "\u76F8\u5904\u65B9\u5F0F"], ["models", "\u6A21\u578B\u4E0E\u8FDE\u63A5"], ["avatar", "\u89D2\u8272\u8C03\u8BD5"]];
+var sections = [["memory", "\u5171\u540C\u8BB0\u5FC6"], ["persona", "\u76F8\u5904\u65B9\u5F0F"], ["models", "\u6A21\u578B\u4E0E\u914D\u7F6E"], ["avatar", "\u89D2\u8272\u8C03\u8BD5"]];
 function useSnapshot(source) {
   const subscribe = useCallback((listener) => source.subscribe(listener), [source]);
   const read = useCallback(() => source.getSnapshot(), [source]);

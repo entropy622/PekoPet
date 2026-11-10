@@ -1,5 +1,16 @@
 # PekoPet 验收记录
 
+## PekoPet 自有 AgentRuntime · 2026-11-10
+
+- Rust 直接启动 scripts/start-agent.mjs；移除 dsh CLI、managed peko profile 和 SDK server 插件启动链。根会话与子会话共用 vendor/peko-agent-loop/src 的本地驱动，能力接口返回 PekoPet 所有权；安装依赖中已无 dsh CLI。
+- agent/composition.yml 固定本应用的服务、工具、权限和界面；仅选择共享 desktop/home 补丁中的模型、MCP 与 skills 配置，包括自定义 skill 目录和 preset 内对应配置。其他 desktop 启动插件、loop 与权限覆盖不会进入加载树。生效配置树留在内存，生成的入口文件只有空列表，不保存凭据副本。
+- 模型配置编辑写回原共享条目，保留注释与其他条目；检测外部修改后要求重新加载，避免覆盖。原生窗口自动启动助手，设置页显示“模型与配置 / 运行时 PekoPet / 已就绪”。
+- 会话、附件、提醒等运行数据改为 DSH_HOME/peko-pet 下的独立目录。隔离迁移验证覆盖根与子会话、引用附件、回滚与重复启动。真实 loop 用例将有效历史和待触发提醒布置为旧版布局，再启动新版：历史、工作目录、记忆和持久道具恢复；继续回复写入新目录，原会话文件逐字节不变，未重播动作或重发操作。
+- 提醒交接只停用旧库中 PekoPet 所有的记录，保留其他提醒及本机恢复记录；交接后才启动新调度器。用例确认旧库的待触发提醒为 inactive，新库仍为 active，普通到期提醒通过自有 loop 完成投递。
+- 本机 MSVC release 构建完成；当前 Node 35 项与 Rust core 13 项用例通过，另补测便携归档排除 local、应用状态、环境文件和凭据文件。自有 loop 覆盖共享 MCP、默认与自定义 skills、流式正文、文件读写、审批允许／拒绝、用户问题、取消、记忆、提醒与升级后恢复。
+- 源码窗口完成 21 张离屏截图；实际便携目录的 exe、随包 Node 和依赖完成 20 张截图的 WebView2 / 无头 WebKit 检查，配置重新加载后保留原会话与文件结果，浏览器异常为零。目录为 dist/PekoPet-owned-runtime-windows-x64；报告为 work/owned-runtime-portable-report.json。测试不激活桌面或移动系统鼠标。
+- 旧应用未强制重启。首次使用新版前退出旧版 PekoPet 及仍使用旧提醒库的 dsh 实例，再启动新版；日常启动无需连接或启动 dsh。桌面交互与长期运行项保留在本文待完成表中。
+
 ## DeepSeek-chan 本机模型 · 2026-11-10
 
 - 导入用户提供的 DeepSeek-chan（大肥鱼）完整运行目录，保留原文件名、目录及使用须知。资源位于忽略的 local/models/deepseek，不提交模型、作者缩略图或 PSD，不随公开便携包发布。署名和限制见 THIRD_PARTY.md。
