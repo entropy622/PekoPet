@@ -26,6 +26,12 @@ npm run dev
 
 已有 clone 可运行 `git submodule update --init --recursive` 补齐 Framework。使用其他已有角色时运行 `npm run assets -- --all`。模型存入本机 DSH_HOME 下的缓存，保留原作者署名和使用说明。
 
+### 双击启动
+
+源码目录准备好上述依赖后，双击根目录的 `start.bat`，自动缓存模型、增量构建并启动。脚本以自身所在目录为基准，移动项目目录后仍可使用，支持包含空格和中文的路径。
+
+同一脚本也可放在便携包的 `pekopet.exe` 旁边，使用随包 Node 和现有 `PekoPet.cmd` 启动，无需编译；原有 `PekoPet.cmd` 保持可用。后续打包会同时包含两个入口。
+
 ### 本地界面开发
 
 装好独立 Build Tools 后，在项目目录运行：

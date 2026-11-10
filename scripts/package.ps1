@@ -10,7 +10,7 @@ try{
   $destination=[IO.Path]::GetFullPath($DestinationPath)
   if((Test-Path -LiteralPath $destination) -and -not $Resume){throw "输出目录已存在：$destination"}
   New-Item -ItemType Directory -Force $destination|Out-Null
-  Copy-Item -LiteralPath 'target/release/pekopet.exe','package.json','package-lock.json','LICENSE','THIRD_PARTY.md','README.md' -Destination $destination
+  Copy-Item -LiteralPath 'target/release/pekopet.exe','package.json','package-lock.json','start.bat','LICENSE','THIRD_PARTY.md','README.md' -Destination $destination
   foreach($folder in @('plugin','scripts','assets','node_modules')){
     & robocopy (Join-Path $root $folder) (Join-Path $destination $folder) /E /XJ /MT:16 /R:2 /W:1 /NFL /NDL /NJH /NJS /NP
     if($LASTEXITCODE -gt 7){throw "复制 $folder 失败"}
