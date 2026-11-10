@@ -54,6 +54,7 @@ struct View {
     busy: bool,
     tab: Tab,
     messages: Vec<Message>,
+    feed_scroll: ScrollHandle,
     sessions: Vec<Value>,
     approvals: Vec<Value>,
     reminders: Vec<Value>,
@@ -104,6 +105,7 @@ impl View {
             busy: false,
             tab: Tab::Chat,
             messages: Vec::new(),
+            feed_scroll: ScrollHandle::new(),
             sessions: Vec::new(),
             approvals: Vec::new(),
             reminders: Vec::new(),
@@ -233,6 +235,7 @@ impl View {
             role: "user".into(),
             text: text.clone(),
         });
+        self.feed_scroll.scroll_to_bottom();
         self.busy = true;
         self.status = "正在思考".into();
         self.sent_at = Some(Instant::now());
@@ -283,8 +286,12 @@ impl View {
         if events.is_empty() {
             return;
         }
+        let follow = self.feed_scroll.max_offset().height + self.feed_scroll.offset().y <= px(48.);
         for e in events {
             self.event(e, cx);
+        }
+        if follow {
+            self.feed_scroll.scroll_to_bottom();
         }
         cx.notify();
     }
@@ -409,6 +416,7 @@ impl View {
                     self.sessions = r["sessions"].as_array().cloned().unwrap_or_default()
                 }
                 Reply::History => {
+                    self.feed_scroll.scroll_to_bottom();
                     self.messages = r["messages"]
                         .as_array()
                         .unwrap_or(&Vec::new())

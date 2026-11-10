@@ -277,6 +277,7 @@ impl View {
             .unwrap_or_else(|| self.cwd.clone());
         page = page.child(
             div()
+                .flex_shrink_0()
                 .flex()
                 .items_center()
                 .justify_between()
@@ -319,6 +320,7 @@ impl View {
         );
         let mut feed = div()
             .id("feed")
+            .track_scroll(&self.feed_scroll)
             .flex_1()
             .min_h_0()
             .overflow_y_scroll()
@@ -401,6 +403,7 @@ impl View {
             feed = feed.child(
                 div()
                     .flex()
+                    .flex_shrink_0()
                     .w_full()
                     .when(user, |s| s.justify_end())
                     .child(bubble),

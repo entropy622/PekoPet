@@ -73,6 +73,7 @@ pub fn glow(alpha: f32, offset: f32, blur: f32) -> Vec<BoxShadow> {
 }
 pub fn surface() -> Div {
     div()
+        .flex_shrink_0()
         .flex()
         .flex_col()
         .gap_4()
