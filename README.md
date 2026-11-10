@@ -81,6 +81,12 @@ npm run package:windows
 
 公开仓库的 Windows CI 运行 Node 测试、Rust 核心测试、Tauri 类型检查、原生 Cubism 编译与链接，并生成 Windows x64 便携包。构建产物位于成功工作流的 `PekoPet-portable-windows-x64` artifact。`PEKO_TYPECHECK=1` 仅用于 `cargo check`，不生成原生程序。
 
+## 手动发布 GitHub Release
+
+打开 Actions → **Publish release** → **Run workflow**，选择 `main` 后运行。工作流固定检出 `main`，复用 Windows 检查与打包，再将 ZIP 上传到对应版本的 GitHub Release。默认勾选预览版，首版为 `v0.1.0`。
+
+版本号取自 `package.json`，需要与 Cargo workspace 和 Tauri 配置一致。发布成功的版本不会被覆盖；下一版先更新三处版本号再手动运行。上传完成后才公开 Release。若发布步骤失败，重新运行失败的发布任务可继续同一提交的草稿。
+
 ## 目录与许可
 
 `crates/peko-core` 是流式协议与角色状态；`crates/pekopet` 是 Tauri 桌面壳和 Rust 角色协议桥；`native` 是 Cubism/Win32 桥接；`plugin` 是 dsh 扩展和 React 前端扩展；`vendor/dsh-ui-chat` 保留固定版本的 MIT 聊天源码与来源；`scripts` 提供启动、模型缓存、SDK 导入和打包。

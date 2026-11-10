@@ -1,0 +1,89 @@
+name: Publish release
+run-name: Publish main · ${{ github.actor }}
+on:
+  workflow_dispatch:
+    inputs:
+      prerelease:
+        description: Mark this release as a preview
+        type: boolean
+        default: true
+permissions:
+  contents: read
+concurrency:
+  group: pekopet-release
+  cancel-in-progress: false
+jobs:
+  build:
+    if: github.repository == 'entropy622/PekoPet'
+    uses: ./.github/workflows/windows.yml
+    with:
+      for-release: true
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.build.outputs.version }}
+      BUILD_COMMIT: ${{ needs.build.outputs.commit }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build.outputs.commit }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: PekoPet-portable-windows-x64
+          path: release
+      - name: Prepare release draft
+        id: draft
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('node:fs');
+            const tag = `v${process.env.VERSION}`;
+            const commit = process.env.BUILD_COMMIT;
+            const repo = context.repo;
+            let release;
+            try {
+              release = (await github.rest.repos.getReleaseByTag({...repo, tag})).data;
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+            if (release && (!release.draft || release.target_commitish !== commit)) {
+              throw new Error(`${tag} already belongs to a published release or another commit`);
+            }
+            const body = fs.readFileSync('docs/RELEASE_NOTES.md', 'utf8')
+              + `\n\nSource: [${commit}](https://github.com/${context.repo.owner}/${context.repo.repo}/commit/${commit})`
+              + `\nBuild: https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            if (!release) {
+              release = (await github.rest.repos.createRelease({
+                ...repo, tag_name: tag, target_commitish: commit,
+                name: `PekoPet ${tag}`, body, draft: true,
+                prerelease: ${{ inputs.prerelease }}
+              })).data;
+            } else {
+              await github.rest.repos.updateRelease({...repo, release_id: release.id, body});
+            }
+            core.setOutput('id', String(release.id));
+      - name: Upload portable application
+        shell: bash
+        run: |
+          tag="v$VERSION"
+          asset="release/PekoPet-$tag-windows-x64.zip"
+          mv release/PekoPet-windows-x64.zip "$asset"
+          gh release upload "$tag" "$asset" --repo "$GITHUB_REPOSITORY" --clobber
+      - name: Publish completed release
+        uses: actions/github-script@v7
+        env:
+          RELEASE_ID: ${{ steps.draft.outputs.id }}
+        with:
+          script: |
+            const release = (await github.rest.repos.updateRelease({
+              ...context.repo, release_id: Number(process.env.RELEASE_ID),
+              draft: false, prerelease: ${{ inputs.prerelease }}
+            })).data;
+            await core.summary.addHeading(`Published ${release.tag_name}`)
+              .addLink('Download release', release.html_url)
+              .addRaw(`\n\nBuilt from main at ${process.env.BUILD_COMMIT}.`)
+              .write();

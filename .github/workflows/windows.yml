@@ -1,18 +1,51 @@
 name: Windows checks
-on: [push, pull_request, workflow_dispatch]
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      for-release:
+        type: boolean
+        default: false
+    outputs:
+      commit:
+        value: ${{ jobs.check.outputs.commit }}
+      version:
+        value: ${{ jobs.check.outputs.version }}
 permissions:
   contents: read
 jobs:
   check:
     runs-on: windows-latest
+    outputs:
+      commit: ${{ steps.metadata.outputs.commit }}
+      version: ${{ steps.metadata.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          ref: ${{ inputs.for-release && 'main' || github.sha }}
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
       - uses: dtolnay/rust-toolchain@stable
+      - name: Resolve build version and source
+        id: metadata
+        shell: pwsh
+        env:
+          FOR_RELEASE: ${{ inputs.for-release }}
+        run: |
+          $version=(Get-Content package.json -Raw|ConvertFrom-Json).version
+          if($version -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$'){throw 'Invalid release version in package.json'}
+          $cargo=(& cargo metadata --format-version 1 --no-deps --locked)|ConvertFrom-Json
+          if($LASTEXITCODE -ne 0){throw 'Cargo version metadata failed'}
+          $tauri=(Get-Content crates/pekopet/tauri.conf.json -Raw|ConvertFrom-Json).version
+          if($tauri -ne $version -or @($cargo.packages|Where-Object{$_.version -ne $version}).Count){throw 'package.json, Cargo workspace and Tauri versions must agree'}
+          if($env:FOR_RELEASE -eq 'true' -and (git tag --list "v$version")){throw "v$version already exists; bump the main version before publishing again"}
+          "commit=$(git rev-parse HEAD)" >> $env:GITHUB_OUTPUT
+          "version=$version" >> $env:GITHUB_OUTPUT
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: windows-tauri-release-v1
