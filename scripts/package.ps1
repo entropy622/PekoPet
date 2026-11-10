@@ -15,9 +15,11 @@ try{
     & robocopy (Join-Path $root $folder) (Join-Path $destination $folder) /E /XJ /MT:16 /R:2 /W:1 /NFL /NDL /NJH /NJS /NP
     if($LASTEXITCODE -gt 7){throw "复制 $folder 失败"}
   }
-  foreach($folder in @('vendor/dsh-ui-chat','node_modules/@deepseek-ai/dsh-client-ui-chat')){
-    & robocopy (Join-Path $root 'vendor/dsh-ui-chat') (Join-Path $destination $folder) /E /MT:16 /R:2 /W:1 /NFL /NDL /NJH /NJS /NP
-    if($LASTEXITCODE -gt 7){throw "复制 dsh React 前端失败"}
+  foreach($fork in @('dsh-ui-chat','dsh-ui-conversation')){
+    foreach($folder in @(("vendor/"+$fork),("node_modules/@deepseek-ai/"+$fork.Replace('dsh-','dsh-client-')))){
+      & robocopy (Join-Path $root ('vendor/'+$fork)) (Join-Path $destination $folder) /E /MT:16 /R:2 /W:1 /NFL /NDL /NJH /NJS /NP
+      if($LASTEXITCODE -gt 7){throw "复制 dsh React 前端失败：$fork"}
+    }
   }
   $node=(Get-Command node.exe).Source
   Copy-Item -LiteralPath $node -Destination (Join-Path $destination 'node.exe')

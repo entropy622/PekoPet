@@ -8,6 +8,7 @@ PekoPet-authored code is MIT. The repository MIT license does not relicense thes
 | Tauri opener plugin | 2.7.2 | Apache-2.0 OR MIT; tauri-apps/plugins-workspace |
 | React / React DOM | dsh frontend bundle | MIT; Meta Platforms and contributors |
 | DeepSeek Harness runtime and frontend | 0.2.1-alpha.4 | MIT; reused npm distribution; local source reference 86a402200d95fecef4529d969836f1fe13c6cb0d |
+| dsh Chat and Conversation source forks | same pinned commit | MIT; vendor/dsh-ui-chat and vendor/dsh-ui-conversation retain LICENSE and SOURCES.md with local changes |
 | Cubism Native Framework | 5-r.5, 145155d2c5bdd8d23475cef9cc3ab46d3220190c | Live2D Open Software License; vendor/cubism-framework/LICENSE.md |
 | Cubism Core | Native 5-r.5 | Live2D Proprietary Software License; only files listed as redistributable may be included |
 

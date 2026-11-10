@@ -17,7 +17,7 @@ export function prepareOverlay(root=resolve(dirname(fileURLToPath(import.meta.ur
   disable.add('cordis-inspect-providers');
   if(embedded){
     disable.clear();
-    for(const id of ['desktop-product-telemetry','product-analytics','harness-dev-context','client-hmr','web-startup','web-runtime','open-in-app','ui-open-in-app'])disable.add(id);
+    for(const id of ['desktop-product-telemetry','product-analytics','harness-dev-context','client-hmr','web-startup','web-runtime','open-in-app','ui-open-in-app','ui-brand-official','ui-message-feedback','ui-settings-account','command-feedback'])disable.add(id);
   }
   const startup=embedded
     ? `    - id: peko-startup\n      name: '${pathToFileURL(resolve(root,'plugin/startup.mjs')).href}'\n    - id: peko-web-runtime\n      name: '@deepseek-ai/dsh-web-app'\n      config:\n        openBrowser: false\n        printUrl: false\n        surfaceContext: false\n    - id: peko-frontend\n      name: '${pathToFileURL(resolve(root,'plugin/frontend/index.mjs')).href}'\n`

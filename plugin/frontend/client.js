@@ -32,17 +32,19 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var client_source_exports = {};
 __export(client_source_exports, {
   apply: () => apply,
+  historyRows: () => historyRows,
   inject: () => inject
 });
 module.exports = __toCommonJS(client_source_exports);
 var import_react = __toESM(require("react"), 1);
 var import_react_dom = require("react-dom");
+var import_dsh_client_store = require("@deepseek-ai/dsh-client-store");
 var import_jsx_runtime = require("react/jsx-runtime");
 var h = import_react.default.createElement;
-var { useState, useEffect } = import_react.default;
+var { useState, useEffect, useRef, useSyncExternalStore, useCallback } = import_react.default;
 var invoke = (command, args = {}) => window.__TAURI__.core.invoke(command, args);
 var request = (method, params = {}) => invoke("peko_request", { method, params });
-var paths = { minimize: "M5 12h14", maximize: "M5 5h14v14H5Z", close: "m6 6 12 12M6 18 18 6", chat: "M4 4h16v13H9l-5 4Z", memory: "M5 4h14v17H5ZM8 9h8m-8 4h8", heart: "M12 21 3 12C-2 4 7 0 12 7c5-7 14-3 9 5Z", connect: "M8 3v5m8-5v5M6 8h12v3a6 6 0 0 1-12 0ZM12 17v5", sliders: "M3 6h18M3 12h18M3 18h18M8 3v6m8 0v6M9 15v6", moon: "M20 14A9 9 0 0 1 10 4a9 9 0 1 0 10 10Z" };
+var paths = { minimize: "M5 12h14", maximize: "M5 5h14v14H5Z", close: "m6 6 12 12M6 18 18 6", chat: "M4 4h16v13H9l-5 4Z", memory: "M5 4h14v17H5ZM8 9h8m-8 4h8", heart: "M12 21 3 12C-2 4 7 0 12 7c5-7 14-3 9 5Z", connect: "M8 3v5m8-5v5M6 8h12v3a6 6 0 0 1-12 0ZM12 17v5", sliders: "M3 6h18M3 12h18M3 18h18M8 3v6m8 0v6M9 15v6", moon: "M20 14A9 9 0 0 1 10 4a9 9 0 1 0 10 10Z", history: "M3 12a9 9 0 1 0 3-6M3 3v6h6M12 7v5l3 2", plus: "M12 5v14M5 12h14", more: "M5 12h.01M12 12h.01M19 12h.01", back: "m14 6-6 6 6 6" };
 var Icon = ({ name }) => h("svg", { viewBox: "0 0 24 24", width: 18, height: 18, fill: "none", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true }, h("path", { d: paths[name] }));
 var Button = ({ children, primary = false, ...props }) => h("button", { type: "button", ...props, className: "peko-button" + (primary ? " peko-primary" : "") + (props.className ? " " + props.className : "") }, children);
 var Card = ({ children, ...props }) => h("section", { ...props, className: "peko-card" + (props.className ? " " + props.className : "") }, children);
@@ -125,8 +127,8 @@ function CompanionPanel({ tab, state, run, onChat }) {
   if (tab === "models") return h(
     "div",
     { className: "peko-panel-content" },
-    h("header", null, h("h1", null, "\u6A21\u578B\u4E0E\u8FDE\u63A5"), h("p", null, "\u804A\u5929\u76F4\u63A5\u4F7F\u7528 dsh \u7684\u6A21\u578B\u9009\u62E9\u3001\u5DE5\u5177\u4E0E\u5BA1\u6279\u754C\u9762\u3002")),
-    h(Card, null, h("h2", null, "\u5171\u4EAB dsh \u914D\u7F6E"), h("dl", null, h("dt", null, "DSH_HOME"), h("dd", null, state.home || "\u6B63\u5728\u8FDE\u63A5"), h("dt", null, "Profile"), h("dd", null, state.profile || "desktop \u2192 peko"), h("dt", null, "\u8FDE\u63A5\u72B6\u6001"), h("dd", null, state.connected ? "\u5DF2\u8FDE\u63A5" : "\u8FDE\u63A5\u5DF2\u65AD\u5F00")), h("div", { className: "peko-actions" }, h(Button, { primary: true, onClick: () => run(() => invoke("peko_reconnect")) }, "\u91CD\u65B0\u8FDE\u63A5 dsh"), h(Button, { onClick: onChat }, "\u56DE\u5230\u804A\u5929\u9009\u62E9\u6A21\u578B"))),
+    h("header", null, h("h1", null, "\u6A21\u578B\u4E0E\u8FDE\u63A5"), h("p", null, "\u6A21\u578B\u3001\u5DE5\u5177\u4E0E\u51ED\u636E\u7EE7\u7EED\u590D\u7528 dsh\u3002")),
+    h(Card, null, h("h2", null, "\u5171\u4EAB dsh \u914D\u7F6E"), h("dl", null, h("dt", null, "DSH_HOME"), h("dd", null, state.home || "\u6B63\u5728\u8FDE\u63A5"), h("dt", null, "Profile"), h("dd", null, state.profile || "desktop \u2192 peko"), h("dt", null, "\u8FDE\u63A5\u72B6\u6001"), h("dd", null, state.connected ? "\u5DF2\u8FDE\u63A5" : "\u8FDE\u63A5\u5DF2\u65AD\u5F00")), h("div", { className: "peko-actions" }, h(Button, { primary: true, onClick: () => run(() => invoke("peko_reconnect")) }, "\u91CD\u65B0\u8FDE\u63A5 dsh"), h(Button, { onClick: onChat }, "\u9009\u62E9\u804A\u5929\u6A21\u578B"))),
     h(Card, null, h("h2", null, "\u4FEE\u6539\u914D\u7F6E\u540E\u91CD\u65B0\u8FDE\u63A5"), h("p", null, "\u7EE7\u7EED\u4F7F\u7528\u539F\u6709 desktop \u914D\u7F6E\u76EE\u5F55\u3001MCP\u3001skills \u4E0E\u51ED\u636E\u3002\u91CD\u65B0\u8FDE\u63A5\u4F1A\u6062\u590D\u754C\u9762\uFF0C\u4E0D\u4F1A\u91CD\u590D\u63D0\u4EA4\u5DE5\u4F5C\u64CD\u4F5C\u3002")),
     h(Button, { className: "peko-danger", onClick: () => invoke("window_action", { action: "exit" }) }, "\u9000\u51FA PekoPet")
   );
@@ -182,39 +184,167 @@ function useNativeState() {
   };
   return { state, error, notice, run };
 }
+var sections = [["memory", "\u5171\u540C\u8BB0\u5FC6"], ["persona", "\u76F8\u5904\u65B9\u5F0F"], ["models", "\u6A21\u578B\u4E0E\u8FDE\u63A5"], ["avatar", "\u89D2\u8272\u8C03\u8BD5"]];
+function useSnapshot(source) {
+  const subscribe = useCallback((listener) => source.subscribe(listener), [source]);
+  const read = useCallback(() => source.getSnapshot(), [source]);
+  return useSyncExternalStore(subscribe, read, read);
+}
+function historyRows(catalog, managed) {
+  const ids = new Set(managed.map((row) => row.id));
+  return catalog.ids.map((id) => catalog.byId[id]).filter((row) => row && !row.blank && !row.parentId && row.origin !== "subagent" && !row.id.startsWith("peko-memory-") && ids.has(row.id)).sort((a, b) => b.updatedAt - a.updatedAt);
+}
+function SkipProductOnboarding({ complete }) {
+  useEffect(() => {
+    complete();
+  }, [complete]);
+  return null;
+}
+function NoProductChrome() {
+  return null;
+}
+function History({ catalog, current, onOpen, onClose }) {
+  const dialog = useRef(null), [managed, setManaged] = useState(null), [error, setError] = useState("");
+  const load = () => {
+    setError("");
+    request("peko.sessions").then((result) => setManaged(result.sessions)).catch((reason) => setError(String(reason)));
+  };
+  useEffect(() => {
+    dialog.current.showModal();
+    load();
+  }, []);
+  const rows = managed === null ? [] : historyRows(catalog, managed);
+  return (0, import_react_dom.createPortal)(/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("dialog", { ref: dialog, className: "peko-history", "aria-label": "\u804A\u5929\u8BB0\u5F55", onCancel: onClose, onClick: (event) => {
+    if (event.target === dialog.current) onClose();
+  }, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", { children: "\u804A\u5929\u8BB0\u5F55" }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", "aria-label": "\u5173\u95ED\u804A\u5929\u8BB0\u5F55", onClick: onClose, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Icon, { name: "close" }) })
+    ] }),
+    error ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { role: "alert", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: error }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Button, { onClick: load, children: "\u91CD\u65B0\u52A0\u8F7D" })
+    ] }) : managed === null ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "peko-muted", children: "\u6B63\u5728\u52A0\u8F7D\u2026" }) : rows.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "peko-muted", children: "\u8FD8\u6CA1\u6709\u804A\u5929\u8BB0\u5F55\u3002" }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "peko-history-list", children: rows.map((row) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", { type: "button", "aria-current": row.id === current ? "page" : void 0, onClick: () => onOpen(row.id), children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: row.title || "\u672A\u547D\u540D\u7684\u5BF9\u8BDD" }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: row.running ? "\u8FDB\u884C\u4E2D" : new Date(row.updatedAt).toLocaleDateString("zh-CN", { month: "short", day: "numeric" }) })
+    ] }, row.id)) })
+  ] }), document.body);
+}
 function Pane({ tab, navigate }) {
   const { state, error, notice, run } = useNativeState();
-  if (!state.settings) return h("main", { className: "peko-companion-main" }, "\u6B63\u5728\u8F7D\u5165\u966A\u4F34\u8BBE\u7F6E\u2026");
-  return h("main", { className: "peko-companion-main" }, error || state.error ? h("div", { role: "alert", className: "peko-error" }, error || state.error) : null, notice ? h("div", { role: "status", className: "peko-notice" }, notice) : null, h(CompanionPanel, { tab, state, run, onChat: () => navigate(null) }));
+  if (!state.settings) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("main", { className: "peko-companion-main", children: "\u6B63\u5728\u8F7D\u5165\u966A\u4F34\u8BBE\u7F6E\u2026" });
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("main", { className: "peko-companion-main", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("nav", { className: "peko-settings-nav", "aria-label": "\u966A\u4F34\u8BBE\u7F6E", children: sections.map(([id, label]) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", "aria-current": tab === id ? "page" : void 0, onClick: () => navigate("peko-" + id), children: label }, id)) }),
+    (error || state.error) && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { role: "alert", className: "peko-error", children: error || state.error }),
+    notice && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { role: "status", className: "peko-notice", children: notice }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CompanionPanel, { tab, state, run, onChat: () => navigate(null, true) })
+  ] });
 }
-function Shell({ navigate }) {
-  const { state, run } = useNativeState();
+function Shell({ navigate, layout, sessions, current, view, onStart, onOpen }) {
+  const { state, error, run } = useNativeState();
+  const panel = useSnapshot(layout.panelInfo), catalog = useSnapshot(sessions.list), selection = useSnapshot(current), surface = useSnapshot(view);
+  const [history, setHistory] = useState(false), menu = useRef(null);
+  const conversationTitle = panel.activePanelId ? void 0 : catalog.byId[selection.key]?.title;
+  useEffect(() => {
+    document.title = conversationTitle ? conversationTitle + " \u2014 PekoPet" : "PekoPet";
+  }, [conversationTitle, selection.key, panel.activePanelId]);
   const action = (value) => invoke("window_action", { action: value });
-  return (0, import_react_dom.createPortal)(
+  const closeMenu = () => {
+    if (menu.current) menu.current.open = false;
+  };
+  const openPanel = (id) => {
+    closeMenu();
+    navigate(id);
+  };
+  useEffect(() => {
+    document.documentElement.toggleAttribute("data-peko-work-options", surface.workOptions);
+    return () => document.documentElement.removeAttribute("data-peko-work-options");
+  }, [surface.workOptions]);
+  useEffect(() => {
+    const outside = (event) => {
+      if (menu.current && !menu.current.contains(event.target)) closeMenu();
+    };
+    const escape = (event) => {
+      if (event.key === "Escape" && menu.current?.open) {
+        closeMenu();
+        menu.current.querySelector("summary").focus();
+      }
+    };
+    document.addEventListener("pointerdown", outside);
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("pointerdown", outside);
+      document.removeEventListener("keydown", escape);
+    };
+  }, []);
+  const busy = state.busy || state.status === "\u7B49\u4F60\u51B3\u5B9A";
+  return (0, import_react_dom.createPortal)(/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", { className: "peko-titlebar peko-chrome", "data-peko-ready": true, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "peko-titlebar-drag", onPointerDown: (e) => {
-        if (e.button === 0) action("drag");
+      panel.activePanelId && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "peko-icon-button", "aria-label": "\u8FD4\u56DE\u804A\u5929", onClick: () => navigate(null), children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Icon, { name: "back" }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "peko-titlebar-drag", onPointerDown: (event) => {
+        if (event.button === 0) action("drag");
       }, onDoubleClick: () => action("maximize"), children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Portrait, { size: 28 }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: "PekoPet" }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "\u4F60\u7684\u684C\u9762\u642D\u6863" })
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { children: "Peko" }),
+        !state.error && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "peko-presence" + (busy ? " is-busy" : ""), role: "status", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", {}),
+          busy ? state.status : ""
+        ] })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", onClick: () => navigate(null), children: "\u804A\u5929\u4E0E\u5DE5\u4F5C" }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "peko-status" + (state.error ? " peko-status-error" : ""), title: state.error || state.status, onClick: () => navigate("peko-models"), children: state.error ? state.connected ? "\u4EFB\u52A1\u63D0\u793A" : "\u68C0\u67E5\u8FDE\u63A5" : state.status || "\u5728\u4F60\u8EAB\u8FB9" }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", "aria-label": "\u52FF\u6270\u6A21\u5F0F", "aria-pressed": !!state.settings?.dnd, onClick: () => run(() => request("peko.settings", { patch: { dnd: !state.settings?.dnd } })), children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Icon, { name: "moon" }) }),
+      state.error && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "peko-connection-error", title: state.error, onClick: () => openPanel("peko-models"), children: "\u67E5\u770B\u63D0\u793A" }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "peko-chat-actions", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "peko-icon-button", "aria-label": "\u804A\u5929\u8BB0\u5F55", title: "\u804A\u5929\u8BB0\u5F55", onClick: () => setHistory(true), children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Icon, { name: "history" }) }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "peko-icon-button", "aria-label": "\u65B0\u5BF9\u8BDD", title: "\u65B0\u5BF9\u8BDD", onClick: () => {
+          navigate(null, false);
+          onStart();
+        }, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Icon, { name: "plus" }) }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("details", { ref: menu, className: "peko-more", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("summary", { "aria-label": "\u66F4\u591A\u9009\u9879", title: "\u66F4\u591A\u9009\u9879", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Icon, { name: "more" }) }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "peko-more-menu", role: "group", "aria-label": "\u66F4\u591A\u9009\u9879", children: [
+            sections.map(([id, label]) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", onClick: () => openPanel("peko-" + id), children: label }, id)),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("hr", {}),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", { type: "button", "aria-pressed": surface.workOptions, onClick: () => {
+              view.set({ workOptions: !surface.workOptions });
+              navigate(null);
+              closeMenu();
+            }, children: [
+              "\u5DE5\u4F5C\u9009\u9879",
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: surface.workOptions ? "\u5DF2\u5C55\u5F00" : "" })
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", { type: "button", "aria-pressed": !!state.settings?.dnd, onClick: () => {
+              closeMenu();
+              run(() => request("peko.settings", { patch: { dnd: !state.settings?.dnd } }));
+            }, children: [
+              "\u52FF\u6270\u6A21\u5F0F",
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: state.settings?.dnd ? "\u5DF2\u5F00\u542F" : "\u5DF2\u5173\u95ED" })
+            ] })
+          ] })
+        ] })
+      ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "peko-window-controls", children: ["minimize", "maximize", "close"].map((value, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", "aria-label": ["\u6700\u5C0F\u5316", "\u6700\u5927\u5316\u6216\u8FD8\u539F", "\u5173\u95ED\u804A\u5929"][i], onClick: () => action(value), children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Icon, { name: value }) }, value)) })
     ] }),
-    document.body
-  );
+    error && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { role: "alert", className: "peko-shell-error", children: error }),
+    history && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(History, { catalog, current: selection.key, onClose: () => setHistory(false), onOpen: (id) => run(async () => {
+      onOpen(id);
+      setHistory(false);
+    }) })
+  ] }), document.body);
 }
 function apply(ctx) {
-  const navigate = (id) => ctx.layout.selectPanel(id);
-  ctx.slots.inject("shell.overlay", () => ctx.slots.register({ name: "shell.overlay", id: "peko-shell" }, () => h(Shell, { navigate })));
-  for (const [index, [tab, label, glyph]] of [["memory", "\u5171\u540C\u8BB0\u5FC6", "memory"], ["persona", "\u76F8\u5904\u65B9\u5F0F", "heart"], ["models", "\u6A21\u578B\u4E0E\u8FDE\u63A5", "connect"], ["avatar", "\u89D2\u8272\u8C03\u8BD5", "sliders"]].entries()) {
-    ctx.slots.inject("main", () => ctx.slots.register({ name: "main", key: "peko-" + tab }, () => h(Pane, { tab, navigate })));
-    ctx.slots.inject("sidebar.panellist", () => ctx.slots.register({ name: "sidebar.panellist", id: "peko-" + tab, order: -40 + index, label: () => label }, () => h(Icon, { name: glyph })));
-  }
-  for (const name of ["sidebar.brand.mark", "sidebar.brand.name", "conversation.hero.brand.mark"]) ctx.slots.inject(name, () => ctx.slots.register({ name, priority: -100 }, () => name.endsWith(".name") ? h("span", null, "PekoPet") : h(Portrait, { size: name.startsWith("conversation") ? 80 : 32 })));
+  const view = (0, import_dsh_client_store.createSnapshotStore)({ workOptions: false });
+  const navigate = (id, workOptions) => {
+    if (workOptions !== void 0) view.set({ workOptions });
+    ctx.layout.selectPanel(id);
+  };
+  ctx.slots.inject("settings.onboarding", () => {
+    const dispose = ["welcome-notice", "deepseek-official"].map((id) => ctx.slots.register({ name: "settings.onboarding", id, priority: -100 }, SkipProductOnboarding));
+    return () => {
+      for (const off of dispose) off();
+    };
+  });
+  ctx.slots.inject("settings.general.item", () => ctx.slots.register({ name: "settings.general.item", id: "current-version", priority: -100 }, NoProductChrome));
+  ctx.slots.inject("shell.overlay", () => ctx.slots.register({ name: "shell.overlay", id: "peko-shell" }, () => h(Shell, { navigate, layout: ctx.layout, sessions: ctx.sessions, current: ctx.uiSession.adapter.current, view, onStart: () => ctx.uiWorkspace.startSession(), onOpen: (id) => ctx.uiWorkspace.openSession(id) })));
+  for (const [tab] of sections) ctx.slots.inject("main", () => ctx.slots.register({ name: "main", key: "peko-" + tab }, () => h(Pane, { tab, navigate })));
   ctx.effect(() => {
     let current;
     const source = ctx.uiSession.adapter.current;
@@ -222,7 +352,7 @@ function apply(ctx) {
       const id = source.getSnapshot().key;
       if (typeof id === "string" && id !== current) {
         current = id;
-        invoke("peko_activate", { sessionId: id }).catch((e) => console.error("[PekoPet]", e));
+        invoke("peko_activate", { sessionId: id }).catch((reason) => console.error("[PekoPet]", reason));
       }
     };
     const off = source.subscribe(update);
@@ -230,7 +360,7 @@ function apply(ctx) {
     return off;
   }, "peko.active-session");
 }
-var inject = ["slots", "uiSession", "layout"];
+var inject = ["slots", "uiSession", "layout", "sessions", "uiWorkspace"];
 
 
 return module.exports;}});

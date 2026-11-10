@@ -5663,6 +5663,7 @@ var TurnProcessNodeView = (0, import_react30.memo)(function TurnProcessNodeView2
         className: TurnProcessNodeView_default.root,
         "data-open": open || void 0,
         "data-turn-process": node.data.turn,
+        "data-turn-state": stopped ? "stopped" : reason === "error" ? "error" : "completed",
         "data-turn-process-messages": node.data.messageCount,
         "data-turn-process-tool-calls": node.data.toolCallCount,
         "data-turn-process-subagents": node.data.subagentCount,

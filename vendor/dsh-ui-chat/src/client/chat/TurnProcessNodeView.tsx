@@ -39,6 +39,7 @@ export const TurnProcessNodeView = memo(function TurnProcessNodeView({
         className={css.root}
         data-open={open || undefined}
         data-turn-process={node.data.turn}
+        data-turn-state={stopped ? 'stopped' : reason === 'error' ? 'error' : 'completed'}
         data-turn-process-messages={node.data.messageCount}
         data-turn-process-tool-calls={node.data.toolCallCount}
         data-turn-process-subagents={node.data.subagentCount}

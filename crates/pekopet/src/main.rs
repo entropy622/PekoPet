@@ -529,7 +529,7 @@ fn main() {
         .setup(move|app|{
             let opener=app.handle().clone();
             let mut builder=tauri::WebviewWindowBuilder::new(app,"main",tauri::WebviewUrl::App("index.html".into()))
-                .title("PekoPet · 你的桌面搭档").inner_size(1120.,800.).min_inner_size(880.,680.).decorations(false).focused(false).visible(!test)
+                .title("PekoPet · 你的桌面搭档").inner_size(720.,760.).min_inner_size(600.,620.).decorations(false).focused(false).visible(!test)
                 .on_new_window(move|url,_|{
                     if matches!(url.scheme(),"http"|"https") {
                         if test {let _=opener.emit("peko-external-link",url.as_str());}

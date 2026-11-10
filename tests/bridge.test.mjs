@@ -14,11 +14,11 @@ test('real dsh loop shares MCP and skills, streams, remembers, approves, asks an
   const patch=join(home,'replay.yml');writeFileSync(patch,`- insert:\n    - id: peko-test-adapter\n      name: '${pathToFileURL(resolve('tests/replay-adapter.mjs')).href}'\n`);
   const start=()=>spawn(process.execPath,['scripts/launch-dsh.mjs','--patch',patch],{env:{...process.env,DSH_HOME:home},windowsHide:true,stdio:['pipe','pipe','pipe']});
   let child=start();
-  let stderr='',next=1;const pending=new Map(),events=[];child.stderr.on('data',b=>stderr+=b);
+  let stderr='',next=1,ready=false;const pending=new Map(),events=[];child.stderr.on('data',b=>stderr+=b);
   let exited=new Promise(r=>child.once('exit',r));
   t.after(async()=>{child.stdin.end();await Promise.race([exited,new Promise(r=>setTimeout(r,3000))]);if(child.exitCode===null)child.kill();await exited;mkdirSync('work',{recursive:true});writeFileSync('work/bridge-diagnostic.json',JSON.stringify({events,stderr},null,2));rmSync(home,{recursive:true});});
-  const attach=()=>createInterface({input:child.stdout}).on('line',line=>{try{const f=JSON.parse(line);events.push(f);if(f.id){const p=pending.get(f.id);if(p){pending.delete(f.id);f.error?p.reject(new Error(f.error.message)):p.resolve(f.result);}}}catch(e){stderr+=e.message;}});attach();
-  const call=(method,params={})=>{const id=next++;return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{pending.delete(id);reject(new Error(`RPC timeout: ${method}; exit=${child.exitCode}; events=${events.length}\n${stderr}`));},method==='peko.capabilities'&&events.length===0?120000:20000);pending.set(id,{resolve:value=>{clearTimeout(timer);resolve(value);},reject:error=>{clearTimeout(timer);reject(error);}});child.stdin.write(JSON.stringify({jsonrpc:'2.0',id,method,params})+'\n');});};
+  const attach=()=>createInterface({input:child.stdout}).on('line',line=>{try{const f=JSON.parse(line);events.push(f);if(f.id){const p=pending.get(f.id);if(p){ready=true;pending.delete(f.id);f.error?p.reject(new Error(f.error.message)):p.resolve(f.result);}}}catch(e){stderr+=e.message;}});attach();
+  const call=(method,params={})=>{const id=next++;return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{pending.delete(id);reject(new Error(`RPC timeout: ${method}; exit=${child.exitCode}; events=${events.length}\n${stderr}`));},method==='peko.capabilities'&&!ready?120000:20000);pending.set(id,{resolve:value=>{clearTimeout(timer);resolve(value);},reject:error=>{clearTimeout(timer);reject(error);}});child.stdin.write(JSON.stringify({jsonrpc:'2.0',id,method,params})+'\n');});};
   async function until(predicate){for(let i=0;i<400;i++){const e=events.find(predicate);if(e)return e;if(child.exitCode!==null)throw new Error(stderr);await new Promise(r=>setTimeout(r,25));}throw new Error(`event timeout\n${stderr}`);}
   const caps=await call('peko.capabilities');assert.equal(caps.sharedProfile,'desktop');assert.ok(caps.providers.some(p=>p.id==='peko-test'));
   await call('initialize',{cwd:home,provider:'peko-test',model:'replay'});
@@ -65,7 +65,7 @@ test('real dsh loop shares MCP and skills, streams, remembers, approves, asks an
   await call('peko.memory',{action:'add',text:'用户喜欢 Rust'});
   await call('peko.settings',{patch:{memoryEnabled:false}});
   await call('shutdown');await exited;assert.equal(child.exitCode,0,stderr);
-  const beforeRestart=events.length;child=start();child.stderr.on('data',b=>stderr+=b);exited=new Promise(r=>child.once('exit',r));attach();
+  const beforeRestart=events.length;ready=false;child=start();child.stderr.on('data',b=>stderr+=b);exited=new Promise(r=>child.once('exit',r));attach();
   await call('peko.capabilities');await call('initialize',{cwd:home,provider:'peko-test',model:'replay'});
   await call('peko.open',{sessionId:'root'});
   assert.equal(realpathSync.native((await call('session/working-directory/get',{sessionId:'root'})).cwd),realpathSync.native(project));
