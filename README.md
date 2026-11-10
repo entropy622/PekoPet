@@ -1,8 +1,8 @@
 # PekoPet
 
-使用 Rust、GPUI、原生 Live2D Cubism 和 DeepSeek Harness 的 Windows 桌面搭档。
+使用 Rust、Tauri 2、React、原生 Live2D Cubism 和 DeepSeek Harness 的 Windows 桌面搭档。
 
-角色窗口独立透明显示；聊天与设置使用 GPUI。模型正文流里的 `[[peko:{"motion":"wave"}]]` 标记即时驱动表情、动作和参数，聊天显示会隐藏控制标记。工作工具、MCP、skills、凭据和权限继续由 dsh 管理。
+角色窗口独立透明显示；整个主窗口使用 React，直接复用 dsh 的聊天前端，陪伴设置通过它的公开 Slot 接口扩展。模型正文流里的 `[[peko:{"motion":"wave"}]]` 标记即时驱动表情、动作和参数，聊天显示会隐藏控制标记。工作工具、MCP、skills、凭据和权限继续由 dsh 管理。
 
 ## 在 Windows 构建
 
@@ -21,10 +21,22 @@ Windows 库随仓库提供。Core 头文件未列入官方再分发清单，导�
 ```powershell
 ./scripts/import-sdk.ps1 -SdkPath D:/SDK/CubismSdkForNative-5-r.5
 npm run assets
-cargo run --release -p pekopet
+npm run dev
 ```
 
 已有 clone 可运行 `git submodule update --init --recursive` 补齐 Framework。使用其他已有角色时运行 `npm run assets -- --all`。模型存入本机 DSH_HOME 下的缓存，保留原作者署名和使用说明。
+
+### 本地界面开发
+
+装好独立 Build Tools 后，在项目目录运行：
+
+```powershell
+npm run dev
+```
+
+此命令自动加载本机 x64 C++ 开发环境，用 Cargo 增量构建并启动原生程序。PekoPet 的界面扩展位于 `plugin/frontend`；聊天源码固定在 `vendor/dsh-ui-chat`，沿用 dsh 的会话、工具、审批与问题组件，仅在正文显示和复制入口过滤表情标记。通过 npm override 加载同一份聊天组件。修改这些 JS/CSS 文件不触发 Rust 重编译。重启开发程序即可加载更新。只编译可用 `npm run build`。发布便携包仍使用 `npm run package:windows`；GitHub Actions 保留测试与发布候选包构建。
+
+运行 `npx playwright install webkit` 准备 WebKit 测试浏览器，再运行 `npm run check:ui`。测试在屏幕外的原生 Tauri/WebView2 窗口检查界面，通过 CDP 操作组件，并使用无头 WebKit 检查同一套 React 前端。它连接真实 dsh loop 的脚本模型，使用临时 DSH_HOME 和项目目录；文件工具只操作该测试目录，不移动系统鼠标、不激活前台窗口。截图和报告写入 `work/ui-checks`。标题栏、任务栏与托盘图标使用本机 Live2D 模型渲染的大头图，缓存于 `DSH_HOME/peko-pet/icons`，附带作者信息。
 
 便携包首次运行使用 `PekoPet.cmd`，它会缓存默认模型再打开程序。此后可以直接打开 `pekopet.exe`。Node 随便携包提供，运行模型缓存无需 Git。
 
@@ -35,10 +47,10 @@ cargo run --release -p pekopet
 - 点击桌宠打开聊天，拖动角色移动位置，滚轮缩放。
 - `Ctrl+Alt+P` 唤起聊天，`Ctrl+Alt+Shift+P` 切换鼠标穿透。
 - 托盘菜单提供置顶、显示、隐藏与退出。关闭聊天保留桌宠。
-- “项目”按钮选择工作目录；工具审批由你决定，可随时停止任务。
+- 聊天沿用 dsh 的工作区、文件选择、模型选择、工具审批和停止任务入口。
 - “共同记忆”可编辑、删除、清空或暂停自动记忆。
 - “相处方式”修改人格，选择陪伴频率；主动陪伴和勿扰分别控制。
-- “模型与连接”选择已有模型，配置变更后重新连接，不会自动重发任务。
+- “模型与连接”显示共享目录与连接状态；聊天中的模型选择沿用 dsh。配置变更后重新连接，不会自动重发任务。
 - “角色调试”预览表情、动作、持久层和参数范围；固定角色选择在重启后生效。
 
 ## 表情协议
@@ -67,10 +79,16 @@ npm run package:windows
 
 `e2e-dsh` 可通过 `PEKO_TEST_PROVIDER` 和 `PEKO_TEST_MODEL` 指定已有测试路由，不改动 dsh 配置。
 
-公开仓库的 Windows CI 运行 Node 测试、Rust 核心测试、GPUI 类型检查、原生 Cubism 编译与链接，并生成 Windows x64 便携包。构建产物位于成功工作流的 `PekoPet-portable-windows-x64` artifact。`PEKO_TYPECHECK=1` 仅用于 `cargo check`，不生成原生程序。
+公开仓库的 Windows CI 运行 Node 测试、Rust 核心测试、Tauri 类型检查、原生 Cubism 编译与链接，并生成 Windows x64 便携包。构建产物位于成功工作流的 `PekoPet-portable-windows-x64` artifact。`PEKO_TYPECHECK=1` 仅用于 `cargo check`，不生成原生程序。
 
 ## 目录与许可
 
-`crates/peko-core` 是流式协议与角色状态；`crates/pekopet` 是 GPUI 客户端；`native` 是 Cubism/Win32 桥接；`plugin` 是 dsh 扩展；`scripts` 提供启动、模型缓存、SDK 导入和打包。
+`crates/peko-core` 是流式协议与角色状态；`crates/pekopet` 是 Tauri 桌面壳和 Rust 角色协议桥；`native` 是 Cubism/Win32 桥接；`plugin` 是 dsh 扩展和 React 前端扩展；`vendor/dsh-ui-chat` 保留固定版本的 MIT 聊天源码与来源；`scripts` 提供启动、模型缓存、SDK 导入和打包。
 
 自有代码为 MIT，第三方组件和模型保留各自许可，见 [第三方说明](THIRD_PARTY.md)。首版使用固定角色目录。SDK 和模型的公开分发按其各自授权处理。
+
+## 平台与 WebView
+
+当前交付目标为 Windows x64，主窗口使用系统 Edge WebView2，并依赖 Microsoft Visual C++ x64 运行库。运行便携包无需 Visual Studio 或 Rust；缺少 `MSVCP140.dll` 时安装 [Visual C++ Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist)。WebView2 缺失时可从 Microsoft 安装 Evergreen Runtime。主窗口与独立的 Live2D 窗口分别管理，关闭聊天保留桌宠，从托盘退出才结束应用。
+
+React 页面共用同一套组件与样式。macOS 的 WKWebView、Linux 的 WebKitGTK 具有不同的浏览器能力；无头 WebKit 检查覆盖前端兼容性，目标系统的输入法、剪贴板、窗口与打包仍需分别验收。当前 Win32／DirectComposition／D3D11 桌宠层需要对应平台实现后再发布其他平台。

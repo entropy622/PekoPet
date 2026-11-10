@@ -29,7 +29,10 @@ struct Rect {
     positioned: i32,
 }
 unsafe extern "C" {
-    fn peko_reduced_motion() -> i32;
+    fn peko_test_window(hwnd: isize);
+    fn peko_create_offscreen(file: *const c_char) -> *mut c_void;
+    fn peko_portrait(p: *mut c_void, rgba: *mut u8, size: i32) -> i32;
+    fn peko_tray_icon(p: *mut c_void, file: *const c_char);
     fn peko_create(path: *const c_char, state: Rect) -> *mut c_void;
     fn peko_destroy(p: *mut c_void);
     fn peko_error() -> *const c_char;
@@ -49,16 +52,77 @@ unsafe extern "C" {
     fn peko_monitor(p: *mut c_void) -> *const c_char;
     fn peko_dpi(p: *mut c_void) -> i32;
     fn peko_configure(p: *mut c_void, state: Rect);
-    fn peko_show_chat(hwnd: isize, show: i32);
-    fn peko_show_chat_quiet(hwnd: isize);
     fn peko_notify(p: *mut c_void, message: *const c_char);
 }
-pub fn reduced_motion() -> bool {
-    static REDUCED: std::sync::LazyLock<bool> = std::sync::LazyLock::new(|| {
-        std::env::var_os("PEKO_REDUCED_MOTION").is_some_and(|v| v == "1")
-            || unsafe { peko_reduced_motion() != 0 }
-    });
-    *REDUCED
+pub fn test_window(hwnd: isize) {
+    unsafe { peko_test_window(hwnd) }
+}
+pub fn portrait_path(id: &str) -> PathBuf {
+    model_path(id)
+        .ancestors()
+        .nth(6)
+        .expect("Model cache root")
+        .join("icons")
+        .join(format!("{id}-head.png"))
+}
+fn upload_textures(ptr: *mut c_void, base: &Path) -> Result<()> {
+    for i in 0..unsafe { peko_texture_count(ptr) } {
+        let relative = unsafe { s(peko_texture_name(ptr, i)) };
+        let rgba = image::open(base.join(relative))?.to_rgba8();
+        anyhow::ensure!(
+            unsafe {
+                peko_texture(
+                    ptr,
+                    i,
+                    rgba.as_ptr(),
+                    rgba.width() as i32,
+                    rgba.height() as i32,
+                )
+            } != 0,
+            "{}",
+            ffi_error()
+        );
+    }
+    Ok(())
+}
+fn save_portrait(ptr: *mut c_void, id: &str, size: u32) -> Result<PathBuf> {
+    let mut image = image::RgbaImage::new(size, size);
+    if unsafe { peko_portrait(ptr, image.as_mut_ptr(), size as i32) } == 0 {
+        return Err(ffi_error());
+    }
+    let icon = image::imageops::resize(&image, 256, 256, image::imageops::FilterType::Lanczos3);
+    let file = portrait_path(id);
+    std::fs::create_dir_all(file.parent().unwrap())?;
+    icon.save(&file)?;
+    let png = std::fs::read(&file)?;
+    let mut ico = vec![0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 32, 0];
+    ico.extend_from_slice(&(png.len() as u32).to_le_bytes());
+    ico.extend_from_slice(&22u32.to_le_bytes());
+    ico.extend_from_slice(&png);
+    std::fs::write(file.with_extension("ico"), ico)?;
+    let metadata = avatar_metadata();
+    std::fs::write(
+        file.with_extension("json"),
+        serde_json::to_vec_pretty(
+            &json!({"avatar":id,"author":metadata["avatars"][id]["author"],"source":"Locally rendered Cubism model portrait","model":metadata["avatars"][id]["model"]}),
+        )?,
+    )?;
+    Ok(file)
+}
+pub fn render_portrait(id: &str) -> Result<PathBuf> {
+    anyhow::ensure!(
+        !avatar_metadata()["avatars"][id].is_null(),
+        "Unknown avatar"
+    );
+    let file = model_path(id);
+    let name = c(&file.to_string_lossy())?;
+    let ptr = unsafe { peko_create_offscreen(name.as_ptr()) };
+    if ptr.is_null() {
+        return Err(ffi_error());
+    }
+    let _guard = Handle(ptr);
+    upload_textures(ptr, file.parent().unwrap())?;
+    save_portrait(ptr, id, 512)
 }
 fn c(s: &str) -> Result<CString> {
     Ok(CString::new(s)?)
@@ -78,22 +142,24 @@ impl Drop for Handle {
 
 pub enum Command {
     Cue(Cue),
+    Session(String, Cue),
     Cancel,
     Settings(Value),
-    Hide(bool),
     Quit,
     Notify(&'static str),
 }
 pub struct Native {
     pub tx: Sender<(Command, Option<Instant>)>,
+    worker: Option<thread::JoinHandle<()>>,
 }
-pub fn show_chat(hwnd: isize, show: bool) {
-    unsafe { peko_show_chat(hwnd, show as i32) }
+impl Drop for Native {
+    fn drop(&mut self) {
+        let _ = self.tx.send((Command::Quit, None));
+        if let Some(worker) = self.worker.take() {
+            let _ = worker.join();
+        }
+    }
 }
-pub fn show_chat_quiet(hwnd: isize) {
-    unsafe { peko_show_chat_quiet(hwnd) }
-}
-
 fn discover(
     base: &Path,
     expressions: &mut BTreeMap<String, PathBuf>,
@@ -155,7 +221,7 @@ fn rect(settings: &Value) -> Rect {
 impl Native {
     pub fn start(file: PathBuf, settings: Value, events: Sender<Value>) -> Self {
         let (tx, rx) = mpsc::channel::<(Command, Option<Instant>)>();
-        thread::spawn(move || {
+        let worker = thread::spawn(move || {
             let result = (|| -> Result<()> {
                 let name = c(&file.to_string_lossy())?;
                 let ptr = unsafe { peko_create(name.as_ptr(), rect(&settings)) };
@@ -164,26 +230,18 @@ impl Native {
                 }
                 let _guard = Handle(ptr);
                 let base = file.parent().context("Missing model directory")?;
-                for i in 0..unsafe { peko_texture_count(ptr) } {
-                    let relative = unsafe { s(peko_texture_name(ptr, i)) };
-                    let rgba = image::open(base.join(relative))?.to_rgba8();
-                    if unsafe {
-                        peko_texture(
-                            ptr,
-                            i,
-                            rgba.as_ptr(),
-                            rgba.width() as i32,
-                            rgba.height() as i32,
-                        )
-                    } == 0
-                    {
-                        return Err(ffi_error());
-                    }
-                }
+                upload_textures(ptr, base)?;
                 let mut expressions = BTreeMap::new();
                 let mut motions = BTreeMap::new();
                 let metadata = avatar_metadata();
                 let id = settings["avatar"].as_str().unwrap_or("yumi");
+                let portrait = portrait_path(id);
+                if !portrait.exists() || !portrait.with_extension("ico").exists() {
+                    save_portrait(ptr, id, 400)?;
+                }
+                let icon = c(&portrait.with_extension("ico").to_string_lossy())?;
+                unsafe { peko_tray_icon(ptr, icon.as_ptr()) };
+                events.send(json!({"native":"portrait","path":portrait}))?;
                 let avatar = &metadata["avatars"][id];
                 let excluded = names(&avatar["excluded"]);
                 let layers = names(&avatar["layers"]);
@@ -222,12 +280,29 @@ impl Native {
                 let start = Instant::now();
                 let mut previous = Instant::now();
                 let mut state = AvatarState::default();
+                let mut session_id = String::new();
                 let mut active_until = Instant::now();
                 let mut latency: Vec<Instant> = Vec::new();
                 loop {
                     let frame_started = Instant::now();
                     for (command, received_at) in rx.try_iter() {
                         match command {
+                            Command::Session(id, mut cue) => {
+                                session_id = id;
+                                state = AvatarState::default();
+                                unsafe { peko_cancel_motion(ptr) };
+                                cue.motion = None;
+                                cue.layers.retain(|name, _| catalog.layers.contains(name));
+                                cue.mix.clear();
+                                cue.params.clear();
+                                state.apply(&cue, start.elapsed().as_millis() as u64);
+                                let layers: BTreeMap<_, _> = state
+                                    .layers
+                                    .iter()
+                                    .map(|name| (name.clone(), true))
+                                    .collect();
+                                events.send(json!({"native":"state","sessionId":session_id,"state":{"layers":layers}}))?;
+                            }
                             Command::Quit => return Ok(()),
                             Command::Notify(message) => {
                                 let text = c(message)?;
@@ -236,11 +311,6 @@ impl Native {
                             Command::Cancel => {
                                 state.cancel();
                                 unsafe { peko_cancel_motion(ptr) };
-                            }
-                            Command::Hide(h) => {
-                                let mut r = unsafe { peko_window_state(ptr) };
-                                r.visible = (!h) as i32;
-                                unsafe { peko_configure(ptr, r) };
                             }
                             Command::Settings(value) => {
                                 let mut r = unsafe { peko_window_state(ptr) };
@@ -262,7 +332,7 @@ impl Native {
                                 state.apply(&cue, start.elapsed().as_millis() as u64);
                                 let layers: BTreeMap<_, _> =
                                     state.layers.iter().map(|n| (n.clone(), true)).collect();
-                                events.send(json!({"native":"state","state":{"layers":layers}}))?;
+                                events.send(json!({"native":"state","sessionId":session_id,"state":{"layers":layers}}))?;
                                 if let Some(m) = &cue.motion {
                                     let p = c(&motions[m].to_string_lossy())?;
                                     if unsafe { peko_motion(ptr, p.as_ptr()) } == 0 {
@@ -342,7 +412,10 @@ impl Native {
                 let _ = events.send(json!({"native":"error","message":format!("{e:#}")}));
             }
         });
-        Self { tx }
+        Self {
+            tx,
+            worker: Some(worker),
+        }
     }
 }
 

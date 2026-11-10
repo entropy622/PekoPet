@@ -10,3 +10,5 @@
 *.user
 *.pdb
 !vendor/**
+
+/crates/pekopet/gen/

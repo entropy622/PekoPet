@@ -23,7 +23,6 @@ pub struct Rpc {
     child: Arc<Mutex<Child>>,
     next: u64,
     closed: bool,
-    pub root: PathBuf,
 }
 impl Rpc {
     pub fn start(root: PathBuf, events: Sender<Value>, generation: u64) -> Result<Self> {
@@ -43,6 +42,7 @@ impl Rpc {
         let mut child = Command::new(node)
             .arg(root.join("scripts/launch-dsh.mjs"))
             .current_dir(&root)
+            .env("PEKO_EMBEDDED_UI", "1")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(stderr)
@@ -98,7 +98,6 @@ impl Rpc {
             child: Arc::new(Mutex::new(child)),
             next: 1,
             closed: false,
-            root,
         })
     }
     pub fn call(&mut self, method: &str, params: Value) -> u64 {

@@ -1,0 +1,42 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "PekoPet",
+  "version": "0.1.0",
+  "identifier": "com.entropy622.pekopet",
+  "build": {
+    "frontendDist": "../../assets/bootstrap"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [],
+    "security": {
+      "capabilities": [
+        {
+          "identifier": "peko-main",
+          "windows": [
+            "main"
+          ],
+          "remote": {
+            "urls": [
+              "http://127.0.0.1:*"
+            ]
+          },
+          "permissions": [
+            "core:event:allow-listen",
+            "core:event:allow-unlisten",
+            "allow-peko-request",
+            "allow-peko-state",
+            "allow-peko-activate",
+            "allow-peko-cue",
+            "allow-peko-reconnect",
+            "allow-window-action"
+          ]
+        }
+      ]
+    }
+  },
+  "bundle": {
+    "active": false,
+    "icon": []
+  }
+}

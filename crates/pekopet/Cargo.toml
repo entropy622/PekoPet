@@ -10,12 +10,11 @@ peko-core = { path = "../peko-core" }
 anyhow.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-gpui = { version = "=0.2.2", default-features = false, features = ["windows-manifest"] }
-rfd = "0.15"
-uuid = { version = "1", features = ["v4"] }
+tauri = { version = "=2.12.5", features = ["image-png"] }
 image = { version = "0.25", default-features = false, features = ["png", "webp", "jpeg"] }
-unicode-segmentation = "1"
-raw-window-handle = "0.6"
+uuid = { version = "1", features = ["v4"] }
+tauri-plugin-opener = "=2.7.2"
 
 [build-dependencies]
 cc = "1"
+tauri-build = "=2.7.4"

@@ -27,6 +27,12 @@ void peko_show_chat(intptr_t hwnd,int show);
 void peko_show_chat_quiet(intptr_t hwnd);
 void peko_notify(void* pet,const char* message);
 int peko_reduced_motion(void);
+void peko_test_window(intptr_t hwnd);
+intptr_t peko_window_icon(intptr_t hwnd,const char* file);
+void peko_release_icon(intptr_t icon);
+void* peko_create_offscreen(const char* model_json);
+int peko_portrait(void* pet,uint8_t* rgba,int size);
+void peko_tray_icon(void* pet,const char* file);
 #ifdef __cplusplus
 }
 #endif

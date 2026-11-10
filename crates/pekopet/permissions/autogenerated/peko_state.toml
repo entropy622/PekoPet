@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-peko-state"
+description = "Enables the peko_state command without any pre-configured scope."
+commands.allow = ["peko_state"]
+
+[[permission]]
+identifier = "deny-peko-state"
+description = "Denies the peko_state command without any pre-configured scope."
+commands.deny = ["peko_state"]

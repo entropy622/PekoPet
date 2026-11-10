@@ -15,12 +15,13 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: windows-native-release-v2
+          shared-key: windows-tauri-release-v1
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npm rebuild @deepseek-ai/dsh-subprocess-local koffi node-pty protobufjs
+      - run: npm run build:frontend
       - run: npm test
       - run: cargo test -p peko-core --locked
-      - name: Type-check GPUI client
+      - name: Type-check Tauri client
         env:
           PEKO_TYPECHECK: '1'
         run: cargo check -p pekopet --locked

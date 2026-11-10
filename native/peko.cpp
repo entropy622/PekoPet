@@ -53,8 +53,11 @@ struct Allocator:ICubismAllocator{
 };
 static Allocator allocator;
 static csmByte* loadShader(const std::string file,csmSizeInt* size){
-    const char* source=file=="FrameworkShaders/CubismEffect.fx"?PEKO_EFFECT_SHADER:file=="FrameworkShaders/CubismBlendMode.fx"?PEKO_BLEND_SHADER:nullptr;
-    if(!source){*size=0;return nullptr;}*size=(csmSizeInt)std::strlen(source);auto data=new csmByte[*size];std::memcpy(data,source,*size);return data;
+    const unsigned char* source=nullptr;
+    if(file=="FrameworkShaders/CubismEffect.fx"){source=PEKO_EFFECT_SHADER;*size=sizeof(PEKO_EFFECT_SHADER);}
+    else if(file=="FrameworkShaders/CubismBlendMode.fx"){source=PEKO_BLEND_SHADER;*size=sizeof(PEKO_BLEND_SHADER);}
+    else{*size=0;return nullptr;}
+    auto data=new csmByte[*size];std::memcpy(data,source,*size);return data;
 }
 static void releaseShader(csmByte* data){delete[] data;}
 
@@ -111,7 +114,7 @@ struct Pet{
     ComPtr<ID3D11Device> device;ComPtr<ID3D11DeviceContext> context;ComPtr<IDXGISwapChain1> swap;
     ComPtr<ID3D11RenderTargetView> target;ComPtr<IDCompositionDevice> composition;ComPtr<IDCompositionTarget> compTarget;ComPtr<IDCompositionVisual> visual;
     std::vector<ComPtr<ID3D11ShaderResourceView>> textures;std::unique_ptr<Model> model;
-    NOTIFYICONDATAW tray{};bool frameworkStarted=false,comStarted=false;CubismFramework::Option option;char monitorName[128]{};int dpi=96;
+    NOTIFYICONDATAW tray{};bool frameworkStarted=false,comStarted=false,offline=false;CubismFramework::Option option;char monitorName[128]{};int dpi=96;intptr_t portraitIcon=0;
     void dragTick(){
         POINT now{};if(!GetCursorPos(&now)){dragging=false;KillTimer(hwnd,1);return;}
         if(abs(now.x-drag.x)+abs(now.y-drag.y)>4)moved=true;
@@ -177,21 +180,22 @@ struct Pet{
         if(!CubismFramework::StartUp(&allocator,&option))throw std::runtime_error("Cubism startup failed");CubismFramework::Initialize();frameworkStarted=true;
         CubismRenderer_D3D11::SetConstantSettings(2,device.Get());model=std::make_unique<Model>();model->load(path(file));model->CreateRenderer(state.width,state.height);
         textures.resize(model->setting->GetTextureCount());
-        tray.cbSize=sizeof(tray);tray.hWnd=hwnd;tray.uID=1;tray.uFlags=NIF_MESSAGE|NIF_ICON|NIF_TIP;tray.uCallbackMessage=WM_APP+1;tray.hIcon=LoadIconW(nullptr,IDI_APPLICATION);wcscpy_s(tray.szTip,L"PekoPet · Ctrl+Alt+P");Shell_NotifyIconW(NIM_ADD,&tray);
-        RegisterHotKey(hwnd,1,MOD_CONTROL|MOD_ALT|MOD_NOREPEAT,'P');RegisterHotKey(hwnd,2,MOD_CONTROL|MOD_ALT|MOD_SHIFT|MOD_NOREPEAT,'P');place();events|=4;
+        if(!offline){tray.cbSize=sizeof(tray);tray.hWnd=hwnd;tray.uID=1;tray.uFlags=NIF_MESSAGE|NIF_ICON|NIF_TIP;tray.uCallbackMessage=WM_APP+1;tray.hIcon=LoadIconW(nullptr,IDI_APPLICATION);wcscpy_s(tray.szTip,L"PekoPet · Ctrl+Alt+P");Shell_NotifyIconW(NIM_ADD,&tray);
+        RegisterHotKey(hwnd,1,MOD_CONTROL|MOD_ALT|MOD_NOREPEAT,'P');RegisterHotKey(hwnd,2,MOD_CONTROL|MOD_ALT|MOD_SHIFT|MOD_NOREPEAT,'P');place();events|=4;}
     }
-    void draw(float dt){
-        if(!state.visible)return;
+    void draw(float dt,bool headshot=false){
+        if(!state.visible&&!headshot)return;
         POINT cursor{state.x+state.width/2,state.y+state.height*2/5};GetCursorPos(&cursor);float gx=std::clamp((cursor.x-state.x-state.width*.5f)/600.f,-1.f,1.f),gy=std::clamp((state.y+state.height*.4f-cursor.y)/600.f,-1.f,1.f);
-        model->update(std::min(dt,0.1f),gx,gy);
+        model->update(std::min(dt,0.1f),headshot?0.f:gx,headshot?0.f:gy);
         const float clear[4]={0,0,0,0};context->ClearRenderTargetView(target.Get(),clear);auto rtv=target.Get();context->OMSetRenderTargets(1,&rtv,nullptr);
-        D3D11_VIEWPORT vp{0,0,(float)state.width,(float)state.height,0,1};context->RSSetViewports(1,&vp);
+        int viewWidth=headshot?std::min(state.width,state.height):state.width,viewHeight=headshot?viewWidth:state.height;
+        D3D11_VIEWPORT vp{0,0,(float)viewWidth,(float)viewHeight,0,1};context->RSSetViewports(1,&vp);
         auto renderer=model->GetRenderer<CubismRenderer_D3D11>();renderer->StartFrame(context.Get());
-        CubismMatrix44 projection;projection.Scale((float)state.height/state.width*state.scale*.925f,state.scale*.925f);projection.MultiplyByMatrix(model->GetModelMatrix());renderer->SetMvpMatrix(&projection);renderer->IsPremultipliedAlpha(false);renderer->DrawModel();renderer->EndFrame();check(swap->Present(1,0),"Present");
+        CubismMatrix44 projection;projection.Scale(headshot?3.6f:(float)state.height/state.width*state.scale*.925f,headshot?3.6f:state.scale*.925f);projection.MultiplyByMatrix(model->GetModelMatrix());if(headshot)projection.TranslateY(-1.95f);renderer->SetMvpMatrix(&projection);renderer->IsPremultipliedAlpha(false);renderer->DrawModel();renderer->EndFrame();if(!headshot)check(swap->Present(1,0),"Present");
     }
     ~Pet(){
-        Shell_NotifyIconW(NIM_DELETE,&tray);
-        if(hwnd){UnregisterHotKey(hwnd,1);UnregisterHotKey(hwnd,2);}
+        if(!offline)Shell_NotifyIconW(NIM_DELETE,&tray);if(portraitIcon)peko_release_icon(portraitIcon);
+        if(hwnd&&!offline){UnregisterHotKey(hwnd,1);UnregisterHotKey(hwnd,2);}
         model.reset();
         if(frameworkStarted){CubismRenderer::StaticRelease();CubismFramework::Dispose();CubismFramework::CleanUp();}
         visual.Reset();compTarget.Reset();composition.Reset();target.Reset();swap.Reset();textures.clear();context.Reset();device.Reset();
@@ -204,6 +208,17 @@ extern "C" {
 int peko_reduced_motion(){BOOL enabled=TRUE;SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION,0,&enabled,0);return !enabled;}
 const char* peko_error(){return last_error.c_str();}
 void* peko_create(const char* file,PekoRect state){try{auto p=std::make_unique<Pet>();p->state=state;p->init(file);return p.release();}catch(const std::exception& e){last_error=e.what();return nullptr;}}
+void* peko_create_offscreen(const char* file){try{auto p=std::make_unique<Pet>();p->offline=true;p->state={-30000,-30000,512,512,1,0,1,0,1};p->init(file);return p.release();}catch(const std::exception& e){last_error=e.what();return nullptr;}}
+int peko_portrait(void* raw,uint8_t* rgba,int size){try{
+    auto p=(Pet*)raw;if(size>p->state.width||size>p->state.height)throw std::runtime_error("Portrait size exceeds render target");
+    p->draw(1.f/30.f,true);ComPtr<ID3D11Resource> resource;p->target->GetResource(&resource);ComPtr<ID3D11Texture2D> source;resource.As(&source);
+    D3D11_TEXTURE2D_DESC description{};source->GetDesc(&description);description.Width=size;description.Height=size;description.Usage=D3D11_USAGE_STAGING;description.BindFlags=0;description.CPUAccessFlags=D3D11_CPU_ACCESS_READ;description.MiscFlags=0;
+    ComPtr<ID3D11Texture2D> staging;check(p->device->CreateTexture2D(&description,nullptr,&staging),"Portrait staging");D3D11_BOX box{0,0,0,(UINT)size,(UINT)size,1};p->context->CopySubresourceRegion(staging.Get(),0,0,0,0,source.Get(),0,&box);
+    D3D11_MAPPED_SUBRESOURCE mapped{};check(p->context->Map(staging.Get(),0,D3D11_MAP_READ,0,&mapped),"Portrait readback");
+    for(int y=0;y<size;++y){auto row=(const uint8_t*)mapped.pData+y*mapped.RowPitch;for(int x=0;x<size;++x){auto pixel=row+x*4;auto output=rgba+((size_t)y*size+x)*4;unsigned a=pixel[3];output[3]=(uint8_t)a;for(int c=0;c<3;++c)output[c]=a?(uint8_t)std::min(255u,(unsigned)pixel[2-c]*255/a):0;}}
+    p->context->Unmap(staging.Get(),0);return 1;
+}catch(const std::exception& e){last_error=e.what();return 0;}}
+void peko_tray_icon(void* raw,const char* file){auto p=(Pet*)raw;auto icon=peko_window_icon(0,file);if(!icon)return;if(p->portraitIcon)peko_release_icon(p->portraitIcon);p->portraitIcon=icon;p->tray.hIcon=(HICON)icon;p->tray.uFlags=NIF_ICON;if(!p->offline)Shell_NotifyIconW(NIM_MODIFY,&p->tray);}
 void peko_destroy(void* p){delete(Pet*)p;}
 int peko_texture_count(void* p){return ((Pet*)p)->model->setting->GetTextureCount();}
 const char* peko_texture_name(void* p,int i){return ((Pet*)p)->model->setting->GetTextureFileName(i);}

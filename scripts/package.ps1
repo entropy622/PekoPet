@@ -4,7 +4,7 @@ $root=Split-Path $PSScriptRoot -Parent
 Push-Location $root
 try{
   if(-not(Test-Path 'local/cubism-core/include/Live2DCubismCore.h')){throw '缺少 Cubism Core，请先执行 scripts/import-sdk.ps1。'}
-  & cargo build --release -p pekopet --locked
+  & (Join-Path $PSScriptRoot 'dev.ps1') -BuildOnly -Release
   if($LASTEXITCODE -ne 0){throw '原生构建失败，未创建交付包。'}
   if(-not $DestinationPath){$DestinationPath=Join-Path $root ('dist/PekoPet-'+(Get-Date -Format 'yyyyMMdd-HHmmss'))}
   $destination=[IO.Path]::GetFullPath($DestinationPath)
@@ -12,8 +12,12 @@ try{
   New-Item -ItemType Directory -Force $destination|Out-Null
   Copy-Item -LiteralPath 'target/release/pekopet.exe','package.json','package-lock.json','LICENSE','THIRD_PARTY.md','README.md' -Destination $destination
   foreach($folder in @('plugin','scripts','assets','node_modules')){
-    & robocopy (Join-Path $root $folder) (Join-Path $destination $folder) /E /NFL /NDL /NJH /NJS /NP
+    & robocopy (Join-Path $root $folder) (Join-Path $destination $folder) /E /XJ /NFL /NDL /NJH /NJS /NP
     if($LASTEXITCODE -gt 7){throw "复制 $folder 失败"}
+  }
+  foreach($folder in @('vendor/dsh-ui-chat','node_modules/@deepseek-ai/dsh-client-ui-chat')){
+    & robocopy (Join-Path $root 'vendor/dsh-ui-chat') (Join-Path $destination $folder) /E /NFL /NDL /NJH /NJS /NP
+    if($LASTEXITCODE -gt 7){throw "复制 dsh React 前端失败"}
   }
   $node=(Get-Command node.exe).Source
   Copy-Item -LiteralPath $node -Destination (Join-Path $destination 'node.exe')

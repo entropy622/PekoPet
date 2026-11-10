@@ -1,301 +1,230 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-mod input;
 mod native;
 mod rpc;
-mod ui;
-mod views;
-use gpui::{actions, prelude::*, *};
-use input::TextInput;
 use native::{Command, Native};
-use peko_core::{Catalog, Cue, Output, Parser, StreamCursor, visible_text};
+use peko_core::{Catalog, Cue, Output, Parser, StreamCursor};
 use serde_json::{Value, json};
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::HashMap,
     path::PathBuf,
-    sync::mpsc::{self, Receiver, Sender},
+    sync::{Arc, Mutex, mpsc},
+    thread,
     time::{Duration, Instant},
 };
+use tauri::{Emitter, Manager};
+use tauri_plugin_opener::OpenerExt;
 
-actions!(peko, [SendMessage]);
-#[derive(Clone, Copy, PartialEq)]
-enum Tab {
-    Chat,
-    Memory,
-    Persona,
-    Models,
-    Avatar,
+type Answer = mpsc::Sender<Result<Value, String>>;
+enum Control {
+    Request(String, Value, Answer),
+    Activate(String),
+    Cue(Cue, Answer),
+    Reconnect,
+    Quit,
 }
-enum Reply {
+struct Bridge {
+    tx: mpsc::Sender<Control>,
+    snapshot: Arc<Mutex<Value>>,
+}
+#[tauri::command]
+async fn peko_request(
+    method: String,
+    params: Value,
+    bridge: tauri::State<'_, Bridge>,
+) -> Result<Value, String> {
+    if !matches!(
+        method.as_str(),
+        "peko.capabilities" | "peko.memory" | "peko.settings" | "peko.cancel" | "peko.sessions"
+    ) {
+        return Err("该接口未向陪伴设置开放".into());
+    }
+    let (tx, rx) = mpsc::channel();
+    bridge
+        .tx
+        .send(Control::Request(method, params, tx))
+        .map_err(|_| "dsh 连接已关闭")?;
+    tauri::async_runtime::spawn_blocking(move || {
+        rx.recv_timeout(Duration::from_secs(60))
+            .map_err(|_| "dsh 请求超时，请重新连接".to_string())?
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+#[tauri::command]
+fn peko_state(bridge: tauri::State<'_, Bridge>) -> Value {
+    bridge.snapshot.lock().unwrap().clone()
+}
+#[tauri::command]
+fn peko_activate(session_id: String, bridge: tauri::State<'_, Bridge>) -> Result<(), String> {
+    bridge
+        .tx
+        .send(Control::Activate(session_id))
+        .map_err(|e| e.to_string())
+}
+#[tauri::command]
+async fn peko_cue(cue: Cue, bridge: tauri::State<'_, Bridge>) -> Result<Value, String> {
+    let (tx, rx) = mpsc::channel();
+    bridge
+        .tx
+        .send(Control::Cue(cue, tx))
+        .map_err(|e| e.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        rx.recv_timeout(Duration::from_secs(5))
+            .map_err(|e| e.to_string())?
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+#[tauri::command]
+fn peko_reconnect(bridge: tauri::State<'_, Bridge>) -> Result<(), String> {
+    bridge
+        .tx
+        .send(Control::Reconnect)
+        .map_err(|e| e.to_string())
+}
+#[tauri::command]
+fn window_action(action: String, window: tauri::WebviewWindow) -> Result<(), String> {
+    match action.as_str() {
+        "drag" => window.start_dragging(),
+        "minimize" => window.minimize(),
+        "maximize" => window.is_maximized().and_then(|max| {
+            if max {
+                window.unmaximize()
+            } else {
+                window.maximize()
+            }
+        }),
+        "close" => window.close(),
+        "exit" => {
+            window.app_handle().exit(0);
+            Ok(())
+        }
+        _ => return Err("未知窗口操作".into()),
+    }
+    .map_err(|e| e.to_string())
+}
+
+enum Pending {
     Capabilities,
-    Initialized,
-    Settings,
-    SettingsSaved(&'static str),
-    Memories,
-    History,
-    Sessions,
+    Activate(String),
+    Frontend(Answer),
     Ordinary,
 }
-struct Message {
-    role: String,
-    text: String,
-}
-struct View {
-    rpc: Option<rpc::Rpc>,
-    tx: Sender<Value>,
-    rx: Receiver<Value>,
+struct Companion {
+    app: tauri::AppHandle,
     root: PathBuf,
-    pending: HashMap<u64, Reply>,
+    rpc: Option<rpc::Rpc>,
+    events: mpsc::Sender<Value>,
+    generation: u64,
+    pending: HashMap<u64, Pending>,
+    native: Option<Native>,
+    catalog: Catalog,
     session: String,
-    cwd: String,
+    settings: Value,
+    avatar_state: Value,
+    home: String,
+    origin: Arc<Mutex<Option<String>>>,
+    snapshot: Arc<Mutex<Value>>,
+    cursor: StreamCursor,
+    parsers: HashMap<u64, Parser>,
+    busy: bool,
+    semantic: bool,
+    latencies: Vec<f64>,
     status: String,
     error: String,
-    notice: String,
-    connected: bool,
-    busy: bool,
-    tab: Tab,
-    messages: Vec<Message>,
-    feed_scroll: ScrollHandle,
-    sessions: Vec<Value>,
-    approvals: Vec<Value>,
-    reminders: Vec<Value>,
-    memories: Vec<Value>,
-    settings: Value,
-    providers: Vec<Value>,
-    provider: String,
-    model: String,
-    composer: Entity<TextInput>,
-    persona: Entity<TextInput>,
-    memory_input: Entity<TextInput>,
-    editing: Option<String>,
-    catalog: Catalog,
-    native: Option<Native>,
-    parsers: HashMap<u64, Parser>,
-    cursor: StreamCursor,
-    current_text: Option<usize>,
-    chat_hwnd: isize,
-    latencies: Vec<f64>,
     sent_at: Option<Instant>,
-    first_token_ms: Option<f64>,
-    generation: u64,
-    question_inputs: HashMap<String, Entity<TextInput>>,
-    question_choices: HashMap<String, Vec<String>>,
-    debug_parameters: BTreeMap<String, f32>,
-    clear_memory_armed: bool,
-    final_reconciled: bool,
-    semantic_cues: bool,
+    first_token: Option<f64>,
+    test: bool,
 }
-impl View {
-    fn new(root: PathBuf, hwnd: isize, cx: &mut Context<Self>) -> Self {
-        let (tx, rx) = mpsc::channel();
-        let mut this = Self {
-            rpc: None,
-            tx,
-            rx,
-            root,
-            pending: HashMap::new(),
-            session: uuid::Uuid::new_v4().to_string(),
-            cwd: std::env::current_dir()
-                .unwrap()
-                .to_string_lossy()
-                .into_owned(),
-            status: "正在连接 dsh".into(),
-            error: String::new(),
-            notice: String::new(),
-            connected: false,
-            busy: false,
-            tab: Tab::Chat,
-            messages: Vec::new(),
-            feed_scroll: ScrollHandle::new(),
-            sessions: Vec::new(),
-            approvals: Vec::new(),
-            reminders: Vec::new(),
-            memories: Vec::new(),
-            settings: json!({}),
-            providers: Vec::new(),
-            provider: String::new(),
-            model: String::new(),
-            composer: cx.new(|cx| TextInput::new("和 Peko 说点什么 · Enter 发送", cx)),
-            persona: cx.new(|cx| TextInput::new("人格与相处方式", cx)),
-            memory_input: cx.new(|cx| TextInput::new("添加或编辑一条记忆", cx)),
-            editing: None,
-            catalog: Catalog::default(),
-            native: None,
-            parsers: HashMap::new(),
-            cursor: StreamCursor::default(),
-            current_text: None,
-            chat_hwnd: hwnd,
-            latencies: Vec::new(),
-            sent_at: None,
-            first_token_ms: None,
-            generation: 0,
-            question_inputs: HashMap::new(),
-            question_choices: HashMap::new(),
-            debug_parameters: BTreeMap::new(),
-            clear_memory_armed: false,
-            final_reconciled: false,
-            semantic_cues: false,
-        };
-        this.connect();
-        cx.spawn(async move |weak, cx| {
-            loop {
-                cx.background_executor()
-                    .timer(Duration::from_millis(16))
-                    .await;
-                if weak
-                    .update(cx, |this, cx| {
-                        this.drain(cx);
-                    })
-                    .is_err()
-                {
-                    break;
-                }
-            }
-        })
-        .detach();
-        this
+impl Companion {
+    fn command(&self, c: Command, at: Option<Instant>) {
+        if let Some(p) = &self.native {
+            let _ = p.tx.send((c, at));
+        }
+    }
+    fn call(&mut self, method: &str, p: Value, reply: Pending) {
+        if let Some(rpc) = &mut self.rpc {
+            let id = rpc.call(method, p);
+            self.pending.insert(id, reply);
+        } else if let Pending::Frontend(answer) = reply {
+            let _ = answer.send(Err("dsh 尚未连接".into()));
+        }
+    }
+    fn publish(&self) {
+        let value = json!({"status":self.status,"error":self.error,"connected":self.rpc.is_some()&&self.origin.lock().unwrap().is_some(),"settings":self.settings,"catalog":self.catalog,"avatarState":self.avatar_state,"home":self.home,"profile":"desktop → peko","sessionId":self.session,"busy":self.busy,"latencies":self.latencies,"firstTokenMs":self.first_token});
+        let mut current = self.snapshot.lock().unwrap();
+        if *current == value {
+            return;
+        }
+        *current = value.clone();
+        drop(current);
+        let _ = self.app.emit("peko-state", value);
     }
     fn connect(&mut self) {
         self.generation += 1;
         self.rpc.take();
-        self.connected = false;
+        for (_, pending) in self.pending.drain() {
+            if let Pending::Frontend(answer) = pending {
+                let _ = answer.send(Err("dsh 已重新连接，未重发操作".into()));
+            }
+        }
+        *self.origin.lock().unwrap() = None;
         self.busy = false;
-        self.pending.clear();
-        self.approvals.clear();
+        self.parsers.clear();
+        self.command(Command::Cancel, None);
+        self.status = "正在连接 dsh".into();
         self.error.clear();
-        match rpc::Rpc::start(self.root.clone(), self.tx.clone(), self.generation) {
+        match rpc::Rpc::start(self.root.clone(), self.events.clone(), self.generation) {
             Ok(rpc) => {
                 self.rpc = Some(rpc);
-                self.call("peko.capabilities", json!({}), Reply::Capabilities);
+                self.call("peko.capabilities", json!({}), Pending::Capabilities);
             }
-            Err(e) => {
-                self.error = format!("{e:#}");
-                self.status = "连接失败".into();
-            }
+            Err(e) => self.error = format!("{e:#}"),
         }
+        self.publish();
     }
-    fn call(&mut self, method: &str, p: Value, reply: Reply) {
-        if let Some(rpc) = &mut self.rpc {
-            let id = rpc.call(method, p);
-            self.pending.insert(id, reply);
-        }
-    }
-    fn save(&mut self, patch: Value) {
-        self.call("peko.settings", json!({"patch":patch}), Reply::Settings);
-    }
-    fn initialize(&mut self) {
-        if self.provider.is_empty() || self.model.is_empty() {
-            self.tab = Tab::Models;
-            self.error = "请选择 dsh 中已配置的模型".into();
-            return;
-        }
-        self.call(
-            "initialize",
-            json!({"cwd":self.cwd,"provider":self.provider,"model":self.model}),
-            Reply::Initialized,
-        );
-    }
-    fn native_command(&self, command: Command) {
-        if let Some(p) = &self.native {
-            let _ = p.tx.send((command, None));
-        }
-    }
-    fn local_state(&self, state: &str) {
+    fn local(&self, status: &str) {
         if let Some(p) = self
             .catalog
             .parameters
             .iter()
             .find(|p| p.id == "ParamAngleZ")
         {
-            let offset = match state {
+            let offset = match status {
                 "thinking" => 6.,
                 "working" => 3.,
                 "waiting" => -6.,
                 _ => 0.,
             };
-            self.native_command(Command::Cue(Cue {
-                params: BTreeMap::from([(p.id.clone(), (p.default + offset).clamp(p.min, p.max))]),
-                hold: Some(1200),
-                ..Default::default()
-            }));
+            self.command(
+                Command::Cue(Cue {
+                    params: std::collections::BTreeMap::from([(
+                        p.id.clone(),
+                        (p.default + offset).clamp(p.min, p.max),
+                    )]),
+                    hold: Some(1200),
+                    ..Default::default()
+                }),
+                None,
+            );
         }
     }
-    fn send(&mut self, _: &SendMessage, _: &mut Window, cx: &mut Context<Self>) {
-        if self.tab != Tab::Chat || !self.connected || self.busy {
-            return;
-        }
-        if self.composer.read(cx).is_composing() {
-            return;
-        }
-        let text = self.composer.read(cx).content.to_string();
-        if text.trim().is_empty() {
-            return;
-        }
-        self.composer.update(cx, |input, cx| input.set("", cx));
-        self.messages.push(Message {
-            role: "user".into(),
-            text: text.clone(),
-        });
-        self.feed_scroll.scroll_to_bottom();
-        self.busy = true;
-        self.status = "正在思考".into();
-        self.sent_at = Some(Instant::now());
-        self.first_token_ms = None;
-        self.current_text = None;
-        self.error.clear();
-        self.semantic_cues = false;
-        self.local_state("thinking");
-        self.call("session/prompt",json!({"sessionId":self.session,"contentBlocks":[{"type":"text","text":text}],"avatar":self.catalog}),Reply::Ordinary);
-        cx.notify();
-    }
-    fn outputs(&mut self, out: Vec<Output>, received_at: Option<Instant>) {
+    fn outputs(&mut self, out: Vec<Output>, at: Option<Instant>) {
         for item in out {
             match item {
-                Output::Text(text) => {
-                    if self.first_token_ms.is_none() {
-                        self.first_token_ms =
-                            self.sent_at.map(|t| t.elapsed().as_secs_f64() * 1000.);
-                    }
-                    let i = *self.current_text.get_or_insert_with(|| {
-                        let i = self.messages.len();
-                        self.messages.push(Message {
-                            role: "assistant".into(),
-                            text: String::new(),
-                        });
-                        i
-                    });
-                    self.messages[i].text.push_str(&text);
-                }
                 Output::Cue(mut cue) => match self.catalog.validate(&mut cue) {
                     Ok(()) => {
-                        self.semantic_cues = true;
-                        if let Some(p) = &self.native {
-                            let _ = p.tx.send((
-                                Command::Cue(cue),
-                                Some(received_at.unwrap_or_else(Instant::now)),
-                            ));
-                        }
+                        self.semantic = true;
+                        self.command(Command::Cue(cue), Some(at.unwrap_or_else(Instant::now)));
                     }
                     Err(e) => self.error = e,
                 },
                 Output::Invalid(e) => self.error = e,
+                Output::Text(_) => {}
             }
         }
     }
-    fn drain(&mut self, cx: &mut Context<Self>) {
-        let events: Vec<_> = self.rx.try_iter().collect();
-        if events.is_empty() {
-            return;
-        }
-        let follow = self.feed_scroll.max_offset().height + self.feed_scroll.offset().y <= px(48.);
-        for e in events {
-            self.event(e, cx);
-        }
-        if follow {
-            self.feed_scroll.scroll_to_bottom();
-        }
-        cx.notify();
-    }
-    fn event(&mut self, e: Value, cx: &mut Context<Self>) {
+    fn event(&mut self, e: Value) {
         if e["connectionGeneration"]
             .as_u64()
             .is_some_and(|g| g != self.generation)
@@ -304,424 +233,340 @@ impl View {
         }
         if let Some(kind) = e["native"].as_str() {
             match kind {
+                "portrait" => {
+                    if let (Some(file), Some(window)) =
+                        (e["path"].as_str(), self.app.get_webview_window("main"))
+                    {
+                        if let Ok(icon) = tauri::image::Image::from_path(file) {
+                            let _ = window.set_icon(icon);
+                        }
+                        let _ = self.app.emit("peko-portrait", json!({}));
+                    }
+                }
                 "catalog" => {
                     if let Ok(c) = serde_json::from_value(e["catalog"].clone()) {
                         self.catalog = c;
+                        self.call("peko.avatar",json!({"sessionId":if self.session.is_empty(){"peko-catalog"}else{&self.session},"catalog":self.catalog}),Pending::Ordinary);
+                    }
+                }
+                "state" => {
+                    if let Some(id) = e["sessionId"].as_str().filter(|s| !s.is_empty()) {
+                        if id == self.session {
+                            self.avatar_state = e["state"].clone();
+                        }
                         self.call(
                             "peko.avatar",
-                            json!({"sessionId":self.session,"catalog":self.catalog}),
-                            Reply::Ordinary,
+                            json!({"sessionId":id,"state":e["state"]}),
+                            Pending::Ordinary,
                         );
                     }
                 }
                 "show" => {
-                    self.tab = Tab::Chat;
-                    native::show_chat(self.chat_hwnd, true);
+                    if !self.test {
+                        if let Some(w) = self.app.get_webview_window("main") {
+                            let _ = w.show();
+                            let _ = w.set_focus();
+                        }
+                    }
                 }
                 "quit" => {
                     self.rpc.take();
-                    cx.quit();
+                    self.command(Command::Quit, None);
+                    self.app.exit(0);
                 }
-                "settings" => self.save(e["patch"].clone()),
-                "state" => self.call(
-                    "peko.avatar",
-                    json!({"sessionId":self.session,"state":e["state"]}),
-                    Reply::Ordinary,
+                "settings" => self.call(
+                    "peko.settings",
+                    json!({"patch":e["patch"]}),
+                    Pending::Ordinary,
                 ),
                 "latency" => {
                     if let Some(ms) = e["ms"].as_f64() {
                         self.latencies.push(ms);
+                        if self.latencies.len() > 500 {
+                            self.latencies.remove(0);
+                        }
                     }
                 }
                 "error" => self.error = e["message"].as_str().unwrap_or("角色渲染失败").into(),
                 _ => {}
             }
+            self.publish();
             return;
         }
-        if let Some(err) = e["transportError"].as_str() {
-            self.error = err.into();
-            self.connected = false;
-            self.busy = false;
+        if let Some(error) = e["transportError"].as_str() {
+            self.error = error.into();
             self.status = "连接已断开".into();
-            self.native_command(Command::Cancel);
+            self.busy = false;
+            self.parsers.clear();
+            self.command(Command::Cancel, None);
+            self.publish();
             return;
         }
         if let Some(id) = e["id"].as_u64() {
             let Some(reply) = self.pending.remove(&id) else {
                 return;
             };
+            if let Pending::Frontend(answer) = reply {
+                let result = if e["error"].is_null() {
+                    Ok(e["result"].clone())
+                } else {
+                    Err(e["error"]["message"].as_str().unwrap_or("请求失败").into())
+                };
+                if let Ok(value) = &result {
+                    if value["persona"].is_string() {
+                        self.settings = value.clone();
+                        self.command(Command::Settings(value.clone()), None);
+                    }
+                }
+                let _ = answer.send(result);
+                self.publish();
+                return;
+            }
             if !e["error"].is_null() {
                 self.error = e["error"]["message"].as_str().unwrap_or("请求失败").into();
-                self.busy = false;
+                self.publish();
                 return;
             }
             let r = &e["result"];
             match reply {
-                Reply::Capabilities => {
-                    self.providers = r["providers"].as_array().cloned().unwrap_or_default();
-                    self.sessions = r["sessions"].as_array().cloned().unwrap_or_default();
+                Pending::Capabilities => {
                     self.settings = r["settings"].clone();
-                    self.provider = self.settings["provider"]
-                        .as_str()
-                        .filter(|x| !x.is_empty())
-                        .or(r["defaultModel"]["provider"].as_str())
-                        .unwrap_or("")
-                        .into();
-                    self.model = self.settings["model"]
-                        .as_str()
-                        .filter(|x| !x.is_empty())
-                        .or(r["defaultModel"]["model"].as_str())
-                        .unwrap_or("")
-                        .into();
-                    self.persona.update(cx, |input, cx| {
-                        input.set(self.settings["persona"].as_str().unwrap_or(""), cx)
-                    });
-                    if self.native.is_none() {
+                    self.home = r["home"].as_str().unwrap_or("").into();
+                    if self.native.is_none() && !self.test {
                         self.native = Some(Native::start(
                             native::model_path(self.settings["avatar"].as_str().unwrap_or("yumi")),
                             self.settings.clone(),
-                            self.tx.clone(),
+                            self.events.clone(),
                         ));
                     }
-                    self.initialize();
-                }
-                Reply::Initialized => {
-                    self.connected = true;
-                    self.status = "在你身边".into();
-                    self.call("peko.memory", json!({}), Reply::Memories);
-                    if self.sessions.iter().any(|s| s["id"] == self.session) {
-                        self.call(
-                            "peko.open",
-                            json!({"sessionId":self.session}),
-                            Reply::Ordinary,
-                        );
-                        self.call(
-                            "peko.history",
-                            json!({"sessionId":self.session}),
-                            Reply::History,
-                        );
+                    if let Some(url) = r["frontendUrl"].as_str() {
+                        match tauri::Url::parse(url) {
+                            Ok(url)
+                                if url.scheme() == "http"
+                                    && url.host_str() == Some("127.0.0.1") =>
+                            {
+                                *self.origin.lock().unwrap() =
+                                    Some(url.origin().ascii_serialization());
+                                if let Some(window) = self.app.get_webview_window("main") {
+                                    if let Err(e) = window.navigate(url) {
+                                        self.error = e.to_string();
+                                    }
+                                }
+                                self.status = "在你身边".into();
+                            }
+                            _ => self.error = "dsh 前端未提供有效的本机地址".into(),
+                        }
+                    } else {
+                        self.error = "dsh 未启用嵌入式前端".into();
                     }
                 }
-                Reply::Settings | Reply::SettingsSaved(_) => {
-                    self.settings = r.clone();
-                    self.native_command(Command::Settings(r.clone()));
-                    if let Reply::SettingsSaved(message) = reply {
-                        self.notice = message.into();
+                Pending::Activate(id) => {
+                    if self.session == id {
+                        self.avatar_state = r["avatarState"].clone();
+                        let cue = serde_json::from_value::<Cue>(r["avatarState"].clone())
+                            .unwrap_or_default();
+                        self.command(Command::Session(id, cue), None);
                     }
                 }
-                Reply::Memories => {
-                    self.memories = r["memories"].as_array().cloned().unwrap_or_default()
-                }
-                Reply::Sessions => {
-                    self.sessions = r["sessions"].as_array().cloned().unwrap_or_default()
-                }
-                Reply::History => {
-                    self.feed_scroll.scroll_to_bottom();
-                    self.messages = r["messages"]
-                        .as_array()
-                        .unwrap_or(&Vec::new())
-                        .iter()
-                        .map(|m| Message {
-                            role: m["role"].as_str().unwrap_or("assistant").into(),
-                            text: if m["role"] == "assistant" {
-                                visible_text(m["text"].as_str().unwrap_or(""))
-                            } else {
-                                m["text"].as_str().unwrap_or("").to_string()
-                            },
-                        })
-                        .collect();
-                    if let Ok(cue) = serde_json::from_value::<Cue>(r["avatarState"].clone()) {
-                        self.native_command(Command::Cue(cue));
-                    }
-                }
-                Reply::Ordinary => {}
+                Pending::Ordinary => {}
+                Pending::Frontend(_) => unreachable!(),
             }
+            self.publish();
             return;
         }
         let p = &e["params"];
         match e["method"].as_str().unwrap_or("") {
             "peko.stream" if p["sessionId"].as_str() == Some(&self.session) => {
                 let f = &p["frame"];
-                let received_at = e["receivedMicros"].as_u64().map(rpc::arrival);
+                let at = e["receivedMicros"].as_u64().map(rpc::arrival);
                 let attempt = f["attemptId"].as_str().unwrap_or("");
-                let rev = f["revision"].as_u64().unwrap_or(0);
+                let revision = f["revision"].as_u64().unwrap_or(0);
                 match f["type"].as_str().unwrap_or("") {
                     "start" => {
-                        if self.cursor.start(attempt, rev) {
+                        if self.cursor.start(attempt, revision) {
                             self.parsers.clear();
-                            self.current_text = None;
-                            self.final_reconciled = false;
                         }
                     }
-                    "chunk" => {
-                        match self
-                            .cursor
-                            .accept(attempt, rev, f["index"].as_u64().unwrap_or(0))
-                        {
-                            Ok(true) => {
-                                let c = &f["chunk"];
-                                let token = match c["type"].as_str().unwrap_or("") {
-                                    "text-delta" | "reasoning-delta" => {
-                                        c["text"].as_str().is_some_and(|s| !s.is_empty())
-                                    }
-                                    "tool-call-delta" => {
-                                        c["name"].is_string()
-                                            || c["argumentsDelta"]
-                                                .as_str()
-                                                .is_some_and(|s| !s.is_empty())
-                                    }
-                                    _ => false,
-                                };
-                                if token && self.first_token_ms.is_none() {
-                                    self.first_token_ms = self.sent_at.map(|sent| {
-                                        received_at
-                                            .unwrap_or_else(Instant::now)
-                                            .saturating_duration_since(sent)
-                                            .as_secs_f64()
-                                            * 1000.
-                                    });
-                                }
-                                match c["type"].as_str().unwrap_or("") {
-                                    "text-delta" => {
-                                        let out = self
-                                            .parsers
-                                            .entry(c["index"].as_u64().unwrap_or(0))
-                                            .or_default()
-                                            .push(c["text"].as_str().unwrap_or(""));
-                                        self.outputs(out, received_at);
-                                    }
-                                    "tool-call-delta" => {
-                                        if let Some(name) = c["name"].as_str() {
-                                            self.status = format!("正在工作 · {name}");
-                                            self.local_state("working");
-                                        }
-                                    }
-                                    _ => {}
-                                }
+                    "chunk" => match self.cursor.accept(
+                        attempt,
+                        revision,
+                        f["index"].as_u64().unwrap_or(0),
+                    ) {
+                        Ok(true) => {
+                            let c = &f["chunk"];
+                            if self.first_token.is_none() {
+                                self.first_token = self.sent_at.map(|t| {
+                                    at.unwrap_or_else(Instant::now)
+                                        .saturating_duration_since(t)
+                                        .as_secs_f64()
+                                        * 1000.
+                                });
                             }
-                            Ok(false) => {}
-                            Err(err) => {
-                                self.error = err.into();
-                                self.parsers.clear();
-                                self.native_command(Command::Cancel);
+                            match c["type"].as_str().unwrap_or("") {
+                                "text-delta" => {
+                                    let out = self
+                                        .parsers
+                                        .entry(c["index"].as_u64().unwrap_or(0))
+                                        .or_default()
+                                        .push(c["text"].as_str().unwrap_or(""));
+                                    self.outputs(out, at);
+                                }
+                                "tool-call-delta" => {
+                                    if c["name"].is_string() {
+                                        self.status = "正在工作".into();
+                                        self.local("working");
+                                    }
+                                }
+                                _ => {}
                             }
                         }
-                    }
+                        Ok(false) => {}
+                        Err(error) => {
+                            self.error = error.into();
+                            self.parsers.clear();
+                            self.command(Command::Cancel, None);
+                        }
+                    },
                     "end" => {
-                        let mut out: Vec<_> =
-                            self.parsers.values_mut().flat_map(|p| p.finish()).collect();
-                        if self.final_reconciled {
-                            out.retain(|o| !matches!(o, Output::Text(_)));
-                        }
-                        self.outputs(out, received_at);
+                        let out = self.parsers.values_mut().flat_map(|p| p.finish()).collect();
+                        self.outputs(out, at);
                         self.parsers.clear();
                         if f["outcome"]["eventType"] == "assistant/attempt"
                             || f["outcome"]["kind"] == "abandoned"
                         {
-                            self.native_command(Command::Cancel);
+                            self.command(Command::Cancel, None);
                         }
                     }
                     _ => {}
                 }
             }
-            "session.event" if p["sessionId"].as_str() == Some(&self.session) => {
-                let event = &p["event"];
-                if event["type"] == "assistant/message" {
-                    self.final_reconciled = true;
-                    let raw: String = event["data"]["message"]["content"]
-                        .as_array()
-                        .unwrap_or(&Vec::new())
-                        .iter()
-                        .filter(|b| b["type"] == "text")
-                        .filter_map(|b| b["text"].as_str())
-                        .collect();
-                    if !raw.is_empty() {
-                        let text = visible_text(&raw);
-                        if let Some(i) = self.current_text {
-                            self.messages[i].text = text;
-                        } else {
-                            self.messages.push(Message {
-                                role: "assistant".into(),
-                                text,
-                            });
-                            self.current_text = Some(self.messages.len() - 1);
-                        }
-                    }
-                }
-            }
-            "peko.work" if p["sessionId"].as_str() == Some(&self.session) => {
-                self.status = "正在处理工具结果".into();
-                let message = &p["event"]["data"]["message"];
-                let raw: String = message["content"]
-                    .as_array()
-                    .into_iter()
-                    .flatten()
-                    .filter(|b| b["type"] == "text")
-                    .filter_map(|b| b["text"].as_str())
-                    .collect();
-                self.messages.push(Message {
-                    role: "tool".into(),
-                    text: format!(
-                        "{}\n{}",
-                        if message["isError"] == true {
-                            "工具失败"
-                        } else {
-                            "工具结果"
-                        },
-                        raw.chars().take(1600).collect::<String>()
-                    ),
-                });
-            }
             "session.status" if p["sessionId"].as_str() == Some(&self.session) => {
-                let was_busy = self.busy;
+                let before = self.busy;
                 self.busy = p["status"] == "running";
-                if !self.busy {
-                    if was_busy {
-                        if !self.semantic_cues {
-                            self.local_state("done");
-                        }
-                        if !self.settings["dnd"].as_bool().unwrap_or(false) {
-                            self.native_command(Command::Notify("这件事处理好了，点我查看。"));
-                        }
-                    }
+                if self.busy && !before {
+                    self.error.clear();
+                    self.sent_at = Some(Instant::now());
+                    self.first_token = None;
+                    self.semantic = false;
+                    self.status = "正在思考".into();
+                    self.local("thinking");
+                } else if !self.busy {
+                    self.parsers.clear();
                     self.status = "在你身边".into();
-                    self.call("peko.sessions", json!({}), Reply::Sessions);
-                }
-            }
-            "peko.approval" => {
-                if let Some(questions) = p["questions"].as_array() {
-                    for q in questions {
-                        let key = format!(
-                            "{}/{}",
-                            p["id"].as_str().unwrap_or(""),
-                            q["id"].as_str().unwrap_or("")
-                        );
-                        self.question_inputs
-                            .insert(key, cx.new(|cx| TextInput::new("也可以填写自己的回答", cx)));
+                    if before {
+                        if !self.semantic {
+                            self.local("done");
+                        }
+                        if self.settings["dnd"] != true {
+                            self.command(Command::Notify("这件事处理好了，点我查看。"), None);
+                        }
                     }
                 }
-                self.approvals.push(p.clone());
-                self.tab = Tab::Chat;
-                self.status = "等你决定".into();
-                self.local_state("waiting");
-                native::show_chat_quiet(self.chat_hwnd);
-                if !self.settings["dnd"].as_bool().unwrap_or(false) {
-                    self.native_command(Command::Notify("需要你做个决定，点我查看。"));
-                }
             }
-            "peko.withdraw" => {
-                self.approvals.retain(|a| a["id"] != p["id"]);
-                let prefix = format!("{}/", p["id"].as_str().unwrap_or(""));
-                self.question_inputs.retain(|k, _| !k.starts_with(&prefix));
-                self.question_choices.retain(|k, _| !k.starts_with(&prefix));
+            "peko.waiting" if p["sessionId"].as_str() == Some(&self.session) => {
+                self.status = "等你决定".into();
+                self.local("waiting");
+                if self.settings["dnd"] != true {
+                    self.command(Command::Notify("需要你做个决定，点我查看。"), None);
+                }
             }
             "peko.memory.changed" => {
-                self.memories = p["memories"].as_array().cloned().unwrap_or_default()
+                let _ = self.app.emit("peko-memory", p.clone());
             }
             "peko.reminder" => {
-                self.reminders.push(p.clone());
-                if !self.settings["dnd"].as_bool().unwrap_or(false) {
-                    self.native_command(Command::Notify("提醒到了，点我查看。"));
+                let _ = self.app.emit("peko-reminder", p.clone());
+                if self.settings["dnd"] != true {
+                    self.command(Command::Notify("提醒到了，点我查看。"), None);
                 }
             }
             "peko.error" => self.error = p["message"].as_str().unwrap_or("dsh 故障").into(),
             _ => {}
         }
-    }
-    fn choose_directory(&mut self) {
-        if self.busy {
-            return;
-        }
-        if let Some(dir) = rfd::FileDialog::new()
-            .set_title("选择工作项目")
-            .pick_folder()
-        {
-            self.cwd = dir.to_string_lossy().into_owned();
-            self.call(
-                "session/working-directory/set",
-                json!({"sessionId":self.session,"path":self.cwd}),
-                Reply::Ordinary,
-            );
-        }
-    }
-    fn new_session(&mut self) {
-        if self.busy {
-            return;
-        }
-        self.session = uuid::Uuid::new_v4().to_string();
-        self.messages.clear();
-        self.current_text = None;
-        self.parsers.clear();
-        self.call(
-            "session/working-directory/set",
-            json!({"sessionId":self.session,"path":self.cwd}),
-            Reply::Ordinary,
-        );
-    }
-    fn answer(&mut self, id: &str, answer: Value) {
-        self.call(
-            "peko.answer",
-            json!({"id":id,"answer":answer}),
-            Reply::Ordinary,
-        );
+        self.publish();
     }
 }
-
-impl Drop for View {
-    fn drop(&mut self) {
-        self.native_command(Command::Quit);
+fn root() -> PathBuf {
+    if let Some(root) = std::env::var_os("PEKO_ROOT") {
+        return root.into();
+    }
+    let exe = std::env::current_exe().unwrap();
+    let parent = exe.parent().unwrap();
+    if parent.join("package.json").exists() {
+        parent.into()
+    } else {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .unwrap()
     }
 }
 fn main() {
-    let root = std::env::var_os("PEKO_ROOT")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| {
-            let exe = std::env::current_exe().unwrap();
-            let parent = exe.parent().unwrap();
-            if parent.join("package.json").exists() {
-                parent.to_owned()
-            } else {
-                PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                    .join("../..")
-                    .canonicalize()
-                    .unwrap()
+    let root = root();
+    let args: Vec<_> = std::env::args_os().collect();
+    if args.get(1).is_some_and(|s| s == "--render-portrait") {
+        match native::render_portrait(args.get(2).and_then(|s| s.to_str()).unwrap_or("yumi")) {
+            Ok(file) => println!("{}", file.display()),
+            Err(e) => {
+                eprintln!("{e:#}");
+                std::process::exit(1);
             }
-        });
-    Application::new()
-        .with_assets(ui::Assets)
-        .run(move |cx: &mut App| {
-            input::bind(cx);
-            cx.bind_keys([KeyBinding::new("enter", SendMessage, Some("Peko"))]);
-            let bounds = Bounds::centered(None, size(px(1120.), px(800.)), cx);
-            cx.open_window(
-                WindowOptions {
-                    focus: false,
-                    window_min_size: Some(size(px(880.), px(680.))),
-                    window_bounds: Some(WindowBounds::Windowed(bounds)),
-                    titlebar: Some(TitlebarOptions {
-                        title: Some("PekoPet · 你的桌面搭档".into()),
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                },
-                move |window, cx| {
-                    let hwnd = match raw_window_handle::HasWindowHandle::window_handle(window)
-                        .unwrap()
-                        .as_raw()
-                    {
-                        raw_window_handle::RawWindowHandle::Win32(h) => h.hwnd.get(),
-                        _ => 0,
-                    };
-                    window.on_window_should_close(cx, move |_, _| {
-                        if !native::is_alive() {
-                            return true;
-                        }
-                        native::show_chat(hwnd, false);
-                        false
-                    });
-                    cx.new(|cx| View::new(root, hwnd, cx))
-                },
-            )
-            .expect("打开 GPUI 窗口失败");
-        });
+        }
+        return;
+    }
+    let (tx, rx) = mpsc::channel();
+    let snapshot = Arc::new(Mutex::new(json!({"status":"正在连接 dsh"})));
+    let shared = snapshot.clone();
+    let control = tx.clone();
+    let origin = Arc::new(Mutex::new(None::<String>));
+    let trusted = origin.clone();
+    let test = std::env::var_os("PEKO_UI_TEST").is_some();
+    let worker: Arc<Mutex<Option<thread::JoinHandle<()>>>> = Arc::new(Mutex::new(None));
+    let setup_worker = worker.clone();
+    let app=tauri::Builder::default().plugin(tauri_plugin_opener::Builder::new().open_js_links_on_click(false).build()).manage(Bridge{tx,snapshot})
+        .invoke_handler(tauri::generate_handler![peko_request,peko_state,peko_activate,peko_cue,peko_reconnect,window_action])
+        .setup(move|app|{
+            let opener=app.handle().clone();
+            let mut builder=tauri::WebviewWindowBuilder::new(app,"main",tauri::WebviewUrl::App("index.html".into()))
+                .title("PekoPet · 你的桌面搭档").inner_size(1120.,800.).min_inner_size(880.,680.).decorations(false).focused(false).visible(!test)
+                .on_new_window(move|url,_|{
+                    if matches!(url.scheme(),"http"|"https") {
+                        if test {let _=opener.emit("peko-external-link",url.as_str());}
+                        else if let Err(error)=opener.opener().open_url(url.as_str(),None::<&str>){eprintln!("打开浏览器失败: {error}");}
+                    }
+                    tauri::webview::NewWindowResponse::Deny
+                })
+                .on_navigation(move|url|url.scheme()=="tauri"||url.host_str()==Some("tauri.localhost")||trusted.lock().unwrap().as_ref().is_some_and(|origin|url.origin().ascii_serialization()==*origin));
+            if let Some(port)=std::env::var_os("PEKO_UI_CHECK_PORT"){builder=builder.additional_browser_args(&format!("--remote-debugging-port={} --disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection",port.to_string_lossy()));}
+            if test{builder=builder.data_directory(root.join("work/test-webview"));}
+            let portrait=native::portrait_path("yumi");
+            if portrait.exists(){builder=builder.icon(tauri::image::Image::from_path(&portrait)?)?;}
+            let window=builder.build()?;
+            if test {native::test_window(window.hwnd()?.0 as isize);}
+            let app_handle=app.handle().clone();
+            window.on_window_event(move|event|{if let tauri::WindowEvent::CloseRequested{api,..}=event{if native::is_alive(){api.prevent_close();if let Some(w)=app_handle.get_webview_window("main"){let _=w.hide();}}}});
+            let app=app.handle().clone();let(events,event_rx)=mpsc::channel();
+            let handle=thread::spawn(move||{
+                let mut state=Companion{app,root,rpc:None,events,generation:0,pending:HashMap::new(),native:None,catalog:Catalog::default(),session:String::new(),settings:json!({}),avatar_state:json!({}),home:String::new(),origin,snapshot:shared,cursor:StreamCursor::default(),parsers:HashMap::new(),busy:false,semantic:false,latencies:Vec::new(),status:String::new(),error:String::new(),sent_at:None,first_token:None,test};
+                if test {if let Some(file)=std::env::var_os("PEKO_UI_FIXTURE_CATALOG") {state.catalog=serde_json::from_slice(&std::fs::read(file).expect("Read UI catalog")).expect("UI fixture catalog");}}
+                state.connect();
+                'main:loop{
+                    for command in rx.try_iter(){match command{
+                        Control::Quit=>break 'main,Control::Reconnect=>state.connect(),
+                        Control::Request(method,p,answer)=>state.call(&method,p,Pending::Frontend(answer)),
+                        Control::Activate(id)=>{state.session=id.clone();state.parsers.clear();state.cursor=StreamCursor::default();state.call("peko.activate",json!({"sessionId":id}),Pending::Activate(id.clone()));state.call("peko.avatar",json!({"sessionId":id,"catalog":state.catalog}),Pending::Ordinary);},
+                        Control::Cue(mut cue,answer)=>{let result=state.catalog.validate(&mut cue).map(|_|{state.command(Command::Cue(cue),None);json!({})});let _=answer.send(result);},
+                    }}
+                    match event_rx.recv_timeout(Duration::from_millis(16)){Ok(event)=>state.event(event),Err(mpsc::RecvTimeoutError::Timeout)=>{},Err(_)=>break,}
+                }
+                state.rpc.take();state.command(Command::Quit,None);
+            });*setup_worker.lock().unwrap()=Some(handle);Ok(())
+        }).build(tauri::generate_context!()).expect("创建 PekoPet 窗口失败");
+    app.run(move |_, event| {
+        if let tauri::RunEvent::Exit = event {
+            let _ = control.send(Control::Quit);
+            if let Some(handle) = worker.lock().unwrap().take() {
+                let _ = handle.join();
+            }
+        }
+    });
 }

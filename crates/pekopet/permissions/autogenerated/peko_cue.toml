@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-peko-cue"
+description = "Enables the peko_cue command without any pre-configured scope."
+commands.allow = ["peko_cue"]
+
+[[permission]]
+identifier = "deny-peko-cue"
+description = "Denies the peko_cue command without any pre-configured scope."
+commands.deny = ["peko_cue"]

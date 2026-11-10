@@ -1,0 +1,9 @@
+{
+  "name": "@pekopet/frontend",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "main": "index.mjs",
+  "exports": {".": "./index.mjs", "./client": "./client.js"},
+  "dsh": {"client": {"platform": "web", "inject": ["@deepseek-ai/dsh-client-ui-session", "@deepseek-ai/dsh-client-ui-chat", "@deepseek-ai/dsh-client-ui-theme"]}}
+}

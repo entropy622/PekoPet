@@ -16,6 +16,28 @@ fn collect(dir: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 fn main() {
+    let home = env::var_os("DSH_HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(env::var_os("USERPROFILE").unwrap()).join(".dsh"));
+    let portrait = home.join("peko-pet/icons/yumi-head.ico");
+    let icon = if portrait.exists() {
+        portrait
+    } else {
+        PathBuf::from("icons/icon.ico")
+    };
+    tauri_build::try_build(
+        tauri_build::Attributes::new()
+            .app_manifest(tauri_build::AppManifest::new().commands(&[
+                "peko_request",
+                "peko_state",
+                "peko_activate",
+                "peko_cue",
+                "peko_reconnect",
+                "window_action",
+            ]))
+            .windows_attributes(tauri_build::WindowsAttributes::new().window_icon_path(icon)),
+    )
+    .expect("Tauri build resources");
     println!("cargo:rerun-if-env-changed=PEKO_TYPECHECK");
     if env::var_os("PEKO_TYPECHECK").is_some() {
         println!(
@@ -37,6 +59,7 @@ fn main() {
     files.push(framework.join("Rendering/csmBlendMode.cpp"));
     collect(&framework.join("Rendering/D3D11"), &mut files);
     files.push(root.join("native/peko.cpp"));
+    files.push(root.join("native/window.cpp"));
     let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
     let mut shaders = String::new();
     for (name, symbol) in [
@@ -45,9 +68,14 @@ fn main() {
     ] {
         let file = framework.join("Rendering/D3D11/Shaders").join(name);
         let source = fs::read_to_string(&file).expect("Cubism D3D11 shader source");
-        shaders.push_str(&format!(
-            "static const char {symbol}[] = R\"PEKO_FX({source})PEKO_FX\";\n"
-        ));
+        shaders.push_str(&format!("static const unsigned char {symbol}[] = {{\n"));
+        for chunk in source.as_bytes().chunks(32) {
+            for byte in chunk {
+                shaders.push_str(&format!("{byte},"));
+            }
+            shaders.push('\n');
+        }
+        shaders.push_str("};\n");
         println!("cargo:rerun-if-changed={}", file.display());
     }
     fs::write(out.join("peko_shaders.h"), shaders).expect("Embed Cubism shaders");
@@ -82,6 +110,8 @@ fn main() {
         "user32",
         "shell32",
         "ole32",
+        "gdi32",
+        "dwmapi",
     ] {
         println!("cargo:rustc-link-lib={lib}");
     }

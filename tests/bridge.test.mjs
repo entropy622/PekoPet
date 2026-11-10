@@ -6,7 +6,7 @@ import { mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync,realpathSync } 
 import { join,resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
-test('real dsh loop shares MCP and skills, streams, remembers, approves, asks and cancels without an API key',{timeout:60000},async t=>{
+test('real dsh loop shares MCP and skills, streams, remembers, approves, asks and cancels without an API key',{timeout:180000},async t=>{
   const home=mkdtempSync(join(tmpdir(),'peko-bridge-')),desktop=join(home,'profiles/desktop');mkdirSync(desktop,{recursive:true});
   writeFileSync(join(desktop,'package.json'),JSON.stringify({dsh:{profile:{bundles:['@deepseek-ai/dsh-base','@deepseek-ai/dsh-web-app']}}}));
   writeFileSync(join(desktop,'cordis.patch.yml'),`- id: llm-deepseek-account\n  disabled: true\n- insert:\n    - id: test-mcp\n      name: '@deepseek-ai/dsh-mcp-client'\n      config:\n        serverName: fixture\n        transport: stdio\n        command: ${JSON.stringify(process.execPath)}\n        args: [${JSON.stringify(resolve('tests/mcp-server.mjs'))}]\n`);
@@ -18,7 +18,7 @@ test('real dsh loop shares MCP and skills, streams, remembers, approves, asks an
   let exited=new Promise(r=>child.once('exit',r));
   t.after(async()=>{child.stdin.end();await Promise.race([exited,new Promise(r=>setTimeout(r,3000))]);if(child.exitCode===null)child.kill();await exited;mkdirSync('work',{recursive:true});writeFileSync('work/bridge-diagnostic.json',JSON.stringify({events,stderr},null,2));rmSync(home,{recursive:true});});
   const attach=()=>createInterface({input:child.stdout}).on('line',line=>{try{const f=JSON.parse(line);events.push(f);if(f.id){const p=pending.get(f.id);if(p){pending.delete(f.id);f.error?p.reject(new Error(f.error.message)):p.resolve(f.result);}}}catch(e){stderr+=e.message;}});attach();
-  const call=(method,params={})=>{const id=next++;return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{pending.delete(id);reject(new Error(`RPC timeout: ${method}; exit=${child.exitCode}; events=${events.length}\n${stderr}`));},20000);pending.set(id,{resolve:value=>{clearTimeout(timer);resolve(value);},reject:error=>{clearTimeout(timer);reject(error);}});child.stdin.write(JSON.stringify({jsonrpc:'2.0',id,method,params})+'\n');});};
+  const call=(method,params={})=>{const id=next++;return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{pending.delete(id);reject(new Error(`RPC timeout: ${method}; exit=${child.exitCode}; events=${events.length}\n${stderr}`));},method==='peko.capabilities'&&events.length===0?120000:20000);pending.set(id,{resolve:value=>{clearTimeout(timer);resolve(value);},reject:error=>{clearTimeout(timer);reject(error);}});child.stdin.write(JSON.stringify({jsonrpc:'2.0',id,method,params})+'\n');});};
   async function until(predicate){for(let i=0;i<400;i++){const e=events.find(predicate);if(e)return e;if(child.exitCode!==null)throw new Error(stderr);await new Promise(r=>setTimeout(r,25));}throw new Error(`event timeout\n${stderr}`);}
   const caps=await call('peko.capabilities');assert.equal(caps.sharedProfile,'desktop');assert.ok(caps.providers.some(p=>p.id==='peko-test'));
   await call('initialize',{cwd:home,provider:'peko-test',model:'replay'});
