@@ -30,6 +30,10 @@ export function apply(ctx){
       const last=options.messages.filter(m=>m.role==='user'&&m.source?.kind==='user').at(-1)?.content.filter(b=>b.type==='text').map(b=>b.text).join('')??'';
       const extraction=system.includes('sourceSeq')&&system.includes('提取');
       const reminder=options.messages.filter(m=>m.role==='user').at(-1)?.source?.kind==='schedule';
+      if(last==='avatar-context-check'){
+        const context=options.messages.flatMap(message=>message.content.filter(block=>block.type==='text').map(block=>block.text)).join('\n');
+        if(!context.includes('日常聊天的大多数回复')||!context.includes('星星眼')||!context.includes('4000—6000'))throw new Error('Active avatar guidance missing from the model request');
+      }
       let text;
       if(extraction){
         if(options.tools?.length)throw new Error('memory extractor received tools');

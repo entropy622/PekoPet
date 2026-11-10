@@ -8,6 +8,8 @@ On 2026-11-09 the repository owner accepted the Live2D Proprietary and Open Soft
 
 Keep one JSON-RPC writer per process. Only root assistant text can emit avatar cues; tool output, reasoning, code and replay must not trigger motions. Approval defaults follow dsh. Never auto-grant an approval.
 
+Expression cadence belongs in the avatar prompt. Derive examples from the active catalog and check real-model marker placement and duration; keep semantic choices with the model and do not add keyword-triggered emotion rules.
+
 Run Node tests with `npm test`, Rust core tests with `cargo test -p peko-core`, and the native app build with `cargo build --release -p pekopet`. Inspect the rendered Web UI and native windows and real model before reporting visual completion. Record outstanding acceptance work in docs/ACCEPTANCE.md.
 
 Use local incremental builds for UI iteration: `npm run build` compiles, and `npm run dev` compiles and launches. These commands load the installed x64 Build Tools environment. Keep GitHub Actions for integration and portable candidates; do not wait for cloud builds between local UI edits when the local toolchain is available.

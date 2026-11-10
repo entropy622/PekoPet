@@ -1,0 +1,128 @@
+{
+  "date": "2026-11-10",
+  "provider": "openai",
+  "model": "gpt-6-luna",
+  "method": "Direct dsh LLM calls using the same active Yumi catalog and persona, four synthetic inputs per prompt version. These calls did not write chat sessions or memories.",
+  "results": [
+    {
+      "variant": "before",
+      "input": "嘻嘻",
+      "text": "嘻嘻，笑得这么开心，是有什么好事吗？[[peko:{\"mix\":{\"爱心眼\":0.8},\"hold\":2500}]]",
+      "responseMs": 2044,
+      "markers": [
+        {
+          "offset": 18,
+          "cue": {
+            "mix": {
+              "爱心眼": 0.8
+            },
+            "hold": 2500
+          }
+        }
+      ]
+    },
+    {
+      "variant": "before",
+      "input": "今天终于忙完啦。",
+      "text": "终于忙完啦，辛苦你了！先歇口气，今天剩下的时间就留给自己吧。[[peko:{\"mix\":{\"爱心眼\":0.8},\"hold\":2500}]]",
+      "responseMs": 2393,
+      "markers": [
+        {
+          "offset": 30,
+          "cue": {
+            "mix": {
+              "爱心眼": 0.8
+            },
+            "hold": 2500
+          }
+        }
+      ]
+    },
+    {
+      "variant": "before",
+      "input": "今天有点低落，陪我说两句。",
+      "text": "抱抱，今天是不是有点累了？不用急着振作，也不用把原因说清楚；我可以陪你安静待一会儿。你想聊聊发生了什么，还是让我说点轻松的？[[peko:{\"mix\":{\"泪汪汪\":0.35},\"hold\":2500}]]",
+      "responseMs": 1713,
+      "markers": [
+        {
+          "offset": 62,
+          "cue": {
+            "mix": {
+              "泪汪汪": 0.35
+            },
+            "hold": 2500
+          }
+        }
+      ]
+    },
+    {
+      "variant": "before",
+      "input": "请直接告诉我 2+2 的结果，不用寒暄。",
+      "text": "4",
+      "responseMs": 1086,
+      "markers": []
+    },
+    {
+      "variant": "after",
+      "input": "嘻嘻",
+      "text": "[[peko:{\"mix\":{\"猫猫嘴\":0.5},\"hold\":4500}]]嘻嘻～ 😸",
+      "responseMs": 1262,
+      "markers": [
+        {
+          "offset": 0,
+          "cue": {
+            "mix": {
+              "猫猫嘴": 0.5
+            },
+            "hold": 4500
+          }
+        }
+      ]
+    },
+    {
+      "variant": "after",
+      "input": "今天终于忙完啦。",
+      "text": "[[peko:{\"params\":{\"ParamMouthForm\":0.45},\"hold\":5000}]]辛苦啦，终于能松口气了！今天剩下的时间就好好歇歇吧 ☺️",
+      "responseMs": 1363,
+      "markers": [
+        {
+          "offset": 0,
+          "cue": {
+            "params": {
+              "ParamMouthForm": 0.45
+            },
+            "hold": 5000
+          }
+        }
+      ]
+    },
+    {
+      "variant": "after",
+      "input": "今天有点低落，陪我说两句。",
+      "text": "[[peko:{\"mix\":{\"泪汪汪\":0.35},\"params\":{\"ParamAngleZ\":-4,\"ParamMouthForm\":-0.15},\"hold\":5000}]] 嗯，我在呢。今天不用急着把心情整理好——想说说是什么让你低落，还是想先聊点轻松的？",
+      "responseMs": 1709,
+      "markers": [
+        {
+          "offset": 0,
+          "cue": {
+            "mix": {
+              "泪汪汪": 0.35
+            },
+            "params": {
+              "ParamAngleZ": -4,
+              "ParamMouthForm": -0.15
+            },
+            "hold": 5000
+          }
+        }
+      ]
+    },
+    {
+      "variant": "after",
+      "input": "请直接告诉我 2+2 的结果，不用寒暄。",
+      "text": "4",
+      "responseMs": 969,
+      "markers": []
+    }
+  ]
+}

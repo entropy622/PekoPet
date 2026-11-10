@@ -29,6 +29,7 @@ test('real dsh loop shares MCP and skills, streams, remembers, approves, asks an
   await call('session/wait',{sessionId:'root'});
   assert.ok(events.some(e=>e.method==='peko.stream'&&e.params.frame.type==='chunk'));
   const history=await call('peko.history',{sessionId:'root'});assert.equal(history.messages[0].text,'我喜欢兔子');assert.ok(history.messages.at(-1).text.includes('[[peko:'));
+  await call('session/prompt',{sessionId:'root',contentBlocks:[{type:'text',text:'avatar-context-check'}]});await call('session/wait',{sessionId:'root'});
   const inventory=await call('peko.capabilities',{sessionId:'root'});assert.ok(inventory.tools.some(t=>t.name==='mcp__fixture__echo'));assert.ok(inventory.skills.skills.some(s=>s.name==='peko-fixture'));
   await until(e=>e.method==='peko.memory.changed');const memories=await call('peko.memory');assert.equal(memories.memories[0].text,'用户喜欢兔子');
   await call('peko.memory',{action:'delete',id:memories.memories[0].id});assert.equal((await call('peko.memory')).memories.length,0);

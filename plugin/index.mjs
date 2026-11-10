@@ -6,6 +6,7 @@ import { resolve, join } from 'node:path';
 import { homedir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { State, containsSecret } from './state.mjs';
+import { avatarContext as buildAvatarContext } from './avatar-context.mjs';
 
 export const name='peko-bridge';
 export const inject=['agents','llm','systemPrompt','workingDirectory','sdkAppStartup','agentPresets','tools','skills'];
@@ -51,7 +52,7 @@ export function apply(ctx) {
   }
   function avatarContext(id) {
     const a=avatars.get(id)??(avatarCatalog?{catalog:avatarCatalog,state:state.avatarState(id)}:undefined);
-    return a?`当前角色目录和状态 ${JSON.stringify(a)}\n在自然正文中插入 [[peko:{"mix":{"实际表情名":0.8},"hold":2500}]] 即时改变表情。params 为白名单参数数值，motion 为动作名，layers 为持久层布尔开关，clear:true 清空表现。仅使用目录里的实际名称。情绪可混合，姿势和道具用 layers 延续到明确关闭。标记放在对应话语之前。不要把整条回复写成 JSON，不要把控制标记放进代码块。`:'角色尚未加载，暂不输出角色控制标记。';
+    return buildAvatarContext(a);
   }
   ctx.on('agent/created',async({agent})=>{
     if(closing)return;
