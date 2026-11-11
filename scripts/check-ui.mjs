@@ -14,7 +14,7 @@ writeFileSync(join(profile,'cordis.patch.yml'),'- id: llm-deepseek-account\n  di
 const patch=join(home,'fixture.yml');writeFileSync(patch,`- insert:\n    - id: peko-test-adapter\n      name: '${pathToFileURL(join(root,'tests/replay-adapter.mjs')).href}'\n    - id: peko-ui-workspace\n      name: '${pathToFileURL(join(root,'tests/ui-workspace.mjs')).href}'\n`);
 const runtimeRoot=process.env.PEKO_UI_ROOT||root,executable=process.env.PEKO_UI_EXE||createRequire(import.meta.url)('electron');
 const args=process.env.PEKO_UI_EXE?['--peko-test']:[root,'--peko-test'];
-if(process.env.PEKO_UI_EXE){const seed=new State(join(home,'peko-pet/state.sqlite3'));seed.updateSettings({avatar:'deepseek'});seed.close();}
+{const seed=new State(join(home,'peko-pet/state.sqlite3'));if(process.env.PEKO_UI_EXE)seed.db.prepare('INSERT OR REPLACE INTO settings VALUES(1,?)').run(JSON.stringify({avatar:'deepseek'}));else seed.updateSettings({avatar:'yumi'});seed.close();}
 const checks=[],snapshots=[],errors=[],runs=[];let app,page,pet,closing=false;
 const until=async(test,timeout=45000)=>{const end=Date.now()+timeout;for(;;){if(await test())return;if(Date.now()>end)throw new Error('Condition timed out');await new Promise(r=>setTimeout(r,50));}};
 async function launch(){
@@ -60,8 +60,9 @@ try{
   await send('questions');await page.getByText('绿色',{exact:true}).click();await page.getByPlaceholder('输入你的答案',{exact:true}).fill('离屏回答');await snap(page,'questions');await page.getByRole('button',{name:'提交',exact:true}).click();await until(async()=>!(await invoke('peko_state')).busy);
   await send('cancel');const cancel=page.getByRole('button',{name:'停止生成',exact:true});await cancel.waitFor();await cancel.click();await until(async()=>!(await invoke('peko_state')).busy);await cancel.waitFor({state:'hidden'});assert.equal((await page.locator('body').innerText()).includes('[[peko:'),false);
   checks.push('real file tools, approval allow/reject, choice and free-text questions, and Stop over the IPC Remote streams');
-  const before=(await invoke('peko_state')).latencies.length;await send('avatar-live');await until(async()=>(await invoke('peko_state')).latencies.length>before);assert.equal((await invoke('peko_state')).busy,true,'Expression must begin before the reply finishes');await until(async()=>!(await invoke('peko_state')).busy);
+  const before=(await invoke('peko_state')).semanticApplied;await send('avatar-live');await until(async()=>(await invoke('peko_state')).semanticApplied>before);assert.equal((await invoke('peko_state')).busy,true,'Expression must begin before the reply finishes');assert.equal((await invoke('peko_state')).lastAvatarEvent.source,'assistant');await until(async()=>await pet.evaluate(()=>window.__pekoAvatarTest.inspect().weights['星星眼']>.1));await until(async()=>!(await invoke('peko_state')).busy);
   checks.push('real root assistant marker changes the avatar before reply completion');
+  const validBefore=(await invoke('peko_state')).semanticApplied;await send('avatar-invalid-then-valid');await until(async()=>(await invoke('peko_state')).semanticApplied>validBefore);await until(async()=>!(await invoke('peko_state')).busy);assert.equal((await invoke('peko_state')).avatarError,'');checks.push('an unsupported cue does not suppress later valid cues in the same real stream');
   await invoke('peko_request',{method:'peko.memory',params:{action:'add',text:'用户喜欢草莓兔兔'}});
   await pane('共同记忆');await page.getByText('用户喜欢草莓兔兔',{exact:true}).waitFor();await snap(page,'memory-saved');
   await pane('角色调试');
@@ -79,6 +80,13 @@ try{
     if(data.catalog.layers.length){await invoke('peko_cue',{cue:{layers:{[data.catalog.layers[0]]:true}}});await until(async()=>(await invoke('peko_state')).avatarState.layers[data.catalog.layers[0]]===true);await snap(pet,id+'-layer');await invoke('peko_cue',{cue:{clear:true}});}
     checks.push(id+': real WebGL render, transparent pixels, visible expression change, persistent layer and '+data.stats.maskBuffers+' mask buffers');
   }
+  await picker.selectOption('yumi');await until(async()=>(await invoke('peko_state')).settings.avatar==='yumi');
+  await pet.waitForFunction(()=>window.__pekoAvatarTest?.catalog.name==='Yumi',null,{timeout:90000});await page.getByRole('heading',{name:'Yumi',exact:true}).waitFor();
+  const selectedFile=modelPath('yumi');await page.getByRole('textbox',{name:'模型文件路径',exact:true}).fill(selectedFile);await page.getByRole('button',{name:'应用路径',exact:true}).click();
+  await until(async()=>(await invoke('peko_state')).modelPaths.yumi===selectedFile);await pet.waitForFunction(()=>window.__pekoAvatarTest?.catalog.name==='Yumi',null,{timeout:90000});
+  await page.getByText('当前文件：'+selectedFile,{exact:true}).waitFor();await snap(page,'model-location');
+  await assert.rejects(()=>invoke('avatar_location',{id:'yumi',path:selectedFile.replace('yumi.model3.json','missing.model3.json')}));assert.equal((await invoke('peko_state')).modelPaths.yumi,selectedFile);
+  checks.push('fixed-character model path is saved, hot-reloaded, validated and retained without copying resources');
   await picker.selectOption('yumi');await until(async()=>(await invoke('peko_state')).settings.avatar==='yumi');await pet.waitForFunction(()=>window.__pekoAvatarTest?.catalog.name==='Yumi',null,{timeout:90000});
   const previous=(await invoke('peko_state')).latencies.length;
   for(let i=0;i<20;i++){await invoke('peko_cue',{cue:{params:{ParamAngleZ:i%2?3:-3},hold:500}});await until(async()=>(await invoke('peko_state')).latencies.length>previous+i);}
@@ -89,7 +97,7 @@ try{
   await invoke('window_action',{action:'close'});assert.equal(await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows().length),2);checks.push('closing chat preserves pet and agent runtime');
   await stop();
   for(let i=0;i<2;i++){
-    await launch();await pane('共同记忆');await page.getByText('用户喜欢草莓兔兔',{exact:true}).waitFor();assert.equal((await invoke('peko_state')).settings.persona,'你是离屏测试的 Peko，工作时简洁直接。');
+    await launch();assert.equal((await invoke('peko_state')).modelPaths.yumi,selectedFile);await pane('共同记忆');await page.getByText('用户喜欢草莓兔兔',{exact:true}).waitFor();assert.equal((await invoke('peko_state')).settings.persona,'你是离屏测试的 Peko，工作时简洁直接。');
     await pane('聊天与工作');await page.getByRole('button',{name:'聊天记录',exact:true}).click();const history=page.getByRole('dialog',{name:'聊天记录',exact:true});await history.locator('.peko-history-list button').first().waitFor();await history.locator('.peko-history-list button').first().click();await page.getByText('你好，我是 Peko。',{exact:true}).first().waitFor();await snap(page,'restart-'+(i+1));await stop();
   }
   checks.push('three consecutive launches using the same persistent Electron userData retain history, persona and memory without authentication');

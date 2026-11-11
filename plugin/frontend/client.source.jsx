@@ -11,9 +11,19 @@ const h=React.createElement,{useState,useEffect,useRef,useSyncExternalStore,useC
   const Card=({children,...props})=>h('section',{...props,className:'peko-card'+(props.className?' '+props.className:'')},children);
   const Field=({label,...props})=>h('label',{className:'peko-field'},h('span',null,label),h('input',props));
   function Portrait({size=36,rev=0}){const [fresh,setFresh]=useState(rev);useEffect(()=>{let live=true,off;window.peko.listen('peko-portrait',()=>setFresh(Date.now())).then(fn=>{if(live)off=fn;else fn();});return()=>{live=false;off?.();};},[]);return h('img',{className:'peko-portrait',src:'/peko/portrait.png?v='+fresh,alt:'角色头像',draggable:false,width:size,height:size});}
+  function ModelLocation({id,state,run}){
+    const [path,setPath]=useState(state.modelPaths?.[id]||'');
+    return h(Card,null,h('h2',null,'本机模型路径'),state.modelFile?h('p',{className:'peko-meta'},'当前文件：'+state.modelFile):null,
+      h(Field,{label:'模型文件路径',value:path,placeholder:'选择此角色的 .model3.json 文件',onChange:e=>setPath(e.target.value)}),
+      h('p',{className:'peko-meta'},'保留完整解压目录；只记录路径，不复制或上传模型。'),h('div',{className:'peko-actions'},
+      h(Button,{onClick:()=>run(async()=>{const file=await invoke('avatar_pick',{id});if(file)setPath(file);})},'浏览文件'),
+      h(Button,{primary:true,disabled:!path.trim(),onClick:()=>run(async()=>{const paths=await invoke('avatar_location',{id,path});setPath(paths[id]||'');},'模型路径已保存')},'应用路径'),
+      h(Button,{onClick:()=>run(async()=>{await invoke('avatar_location',{id,path:''});setPath('');},'已恢复自动查找')},'恢复自动查找')));
+  }
   function CompanionPanel({tab,state,run,onChat}){
     const [memories,setMemories]=useState([]),[draft,setDraft]=useState(''),[editing,setEditing]=useState(null),[persona,setPersona]=useState(state.settings?.persona||''),[mix,setMix]=useState({}),[params,setParams]=useState({}),[clearing,setClearing]=useState(false);
     const settings=state.settings||{},catalog=state.catalog||{};
+    useEffect(()=>{setMix({});setParams({});},[settings.avatar]);
     useEffect(()=>{
       if(tab!=='memory')return;
       let live=true,off;
@@ -44,11 +54,12 @@ const h=React.createElement,{useState,useEffect,useRef,useSyncExternalStore,useC
     const latency=state.latencies||[],sorted=[...latency].sort((a,b)=>a-b),p95=sorted.length?sorted[Math.ceil(sorted.length*.95)-1].toFixed(1)+' ms':'等待角色事件';
     return h('div',{className:'peko-panel-content'},
       h('header',null,h('h1',null,'让每个表情都刚刚好'),h('p',null,'表情可混合，姿势与道具会延续到明确关闭。')),
-      h(Card,null,h('div',{className:'peko-row'},h('h2',null,catalog.name||'正在加载角色'),h('label',null,'角色 ',h('select',{'aria-label':'角色',value:settings.avatar||'yumi',onChange:e=>update({avatar:e.target.value})},Object.entries(avatarMetadata.avatars).map(([id,avatar])=>h('option',{key:id,value:id},avatar.name))))),h('p',{className:'peko-meta'},'切换角色后立即生效。'),h('div',{className:'peko-grid'},(catalog.expressions||[]).map(name=>h('label',{key:name,className:'peko-range'},h('span',null,name),h('input',{type:'range',min:0,max:1,step:.05,value:mix[name]||0,'aria-label':name,onChange:e=>setMix({...mix,[name]:Number(e.target.value)})}),h('output',null,(mix[name]||0).toFixed(2))))),h(Button,{primary:true,onClick:()=>cue({mix,hold:2500})},'预览混合表情')),
+      h(Card,null,h('div',{className:'peko-row'},h('h2',null,catalog.name||'正在加载角色'),h('label',null,'角色 ',h('select',{'aria-label':'角色',value:settings.avatar||'deepseek',onChange:e=>update({avatar:e.target.value})},Object.entries(avatarMetadata.avatars).map(([id,avatar])=>h('option',{key:id,value:id},avatar.name))))),h('p',{className:'peko-meta'},'切换角色后立即生效。'),h('div',{className:'peko-grid'},(catalog.expressions||[]).map(name=>h('label',{key:name,className:'peko-range'},h('span',null,name),h('input',{type:'range',min:0,max:1,step:.05,value:mix[name]||0,'aria-label':name,onChange:e=>setMix({...mix,[name]:Number(e.target.value)})}),h('output',null,(mix[name]||0).toFixed(2))))),h(Button,{primary:true,onClick:()=>cue({mix,hold:2500})},'预览混合表情')),
+      h(ModelLocation,{key:settings.avatar,id:settings.avatar,state,run}),
       h(Card,null,h('h2',null,'持续姿势与道具'),h('div',{className:'peko-actions'},(catalog.layers||[]).map(name=>{const active=state.avatarState?.layers?.[name]===true;return h(Button,{key:name,'aria-pressed':active,onClick:()=>cue({layers:{[name]:!active}})},name);}))),
       h(Card,null,h('h2',null,'动作'),h('div',{className:'peko-actions'},(catalog.motions||[]).map(name=>h(Button,{key:name,onClick:()=>cue({motion:name})},name)))),
       h(Card,null,h('h2',null,'模型参数'),h('div',{className:'peko-grid'},(catalog.parameters||[]).map(p=>h('label',{key:p.id,className:'peko-range'},h('span',null,p.id),h('input',{type:'range',min:p.min,max:p.max,step:(p.max-p.min)/100||.01,value:params[p.id]??p.default,'aria-label':p.id,onChange:e=>{const value=Number(e.target.value);setParams({...params,[p.id]:value});cue({params:{[p.id]:value},hold:1200});}}),h('output',null,(params[p.id]??p.default).toFixed(2)))))),
-      h(Card,null,h('div',{className:'peko-row'},h('p',null,'本地角色响应 P95 · '+p95),h(Button,{onClick:()=>{setMix({});setParams({});cue({clear:true});}},'恢复默认表现'))));
+      h(Card,null,h('div',{className:'peko-row'},h('div',null,h('p',null,'本地角色响应 P95 · '+p95),h('p',{className:'peko-meta'},'已播放对话表现：'+(state.semanticApplied||0)+' 次'),state.lastAvatarEvent?h('p',{className:'peko-meta'},({assistant:'对话',debug:'手动调试',status:'本地状态'}[state.lastAvatarEvent.source]||'角色')+' · '+[...Object.keys(state.lastAvatarEvent.cue?.mix||{}),...Object.keys(state.lastAvatarEvent.cue?.layers||{}),...Object.keys(state.lastAvatarEvent.cue?.params||{}),state.lastAvatarEvent.cue?.motion].filter(Boolean).join('、')):null),h(Button,{onClick:()=>{setMix({});setParams({});cue({clear:true});}},'恢复默认表现'))));
   }
   function useNativeState(){
     const [state,setState]=useState({}),[error,setError]=useState(''),[notice,setNotice]=useState('');

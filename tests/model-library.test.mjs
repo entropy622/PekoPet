@@ -35,6 +35,7 @@ test('asset setup repairs an incomplete cache even when its model3 file already 
   const options=fixture(t);
   for(const folder of ['scripts','assets','plugin'])mkdirSync(join(options.root,folder));
   copyFileSync('scripts/fetch-models.mjs',join(options.root,'scripts/fetch-models.mjs'));
+  copyFileSync('plugin/model-locations.ts',join(options.root,'plugin/model-locations.ts'));
   copyFileSync('plugin/model-path.mjs',join(options.root,'plugin/model-path.mjs'));
   copyFileSync('assets/avatars.json',join(options.root,'assets/avatars.json'));
   writeFileSync(join(options.root,'package.json'),'{"type":"module"}');

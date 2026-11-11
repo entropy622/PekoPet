@@ -1,6 +1,6 @@
 {
   "name": "pekopet",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "type": "module",
   "engines": {
@@ -15,7 +15,8 @@
     "package:windows": "node scripts/package-electron.mjs",
     "build:frontend": "node scripts/build-frontend.mjs",
     "start:agent": "node scripts/start-agent.mjs",
-    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.renderer.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.renderer.json",
+    "check:avatar": "node scripts/check-avatar-behavior.mjs"
   },
   "dependencies": {
     "@deepseek-ai/cordis": "4.0.5",

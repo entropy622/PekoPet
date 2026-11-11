@@ -11,7 +11,7 @@ export const defaultSettings = {
   activeStart: 9, activeEnd: 22, maxDailyGreetings: 2,
   petX: 1100, petY: 400, petWidth: 400, petHeight: 600, petScale: 1,
   petMonitor: '', petDpi: 96,
-  topmost: true, clickThrough: false, avatar: 'yumi', provider: '', model: '',
+  topmost: true, clickThrough: false, avatar: 'deepseek', provider: '', model: '',
 };
 
 function fingerprint(text) { return text.normalize('NFKC').toLocaleLowerCase().replace(/[\p{P}\p{Z}\s]/gu, ''); }

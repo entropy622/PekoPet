@@ -26,7 +26,7 @@ Cubism Web 5-r.5 的 Framework、GLSL 着色器及清单允许的 Core 运行文
 
 从 Rust/Tauri 版本升级时，原 `DSH_HOME/peko-pet` 中的会话、记忆、人格和提醒继续使用。Electron 窗口偏好使用自己的 userData；旧版 WebView 的 cookie 不参与新应用启动。请先退出旧版，避免两个 Agent Runtime 同时操作同一会话。
 
-默认角色为 Yumi。若保存的私有角色在当前电脑尚未安装，聊天仍可使用，并显示资源提示；在角色调试中选择已安装角色即可恢复桌宠。
+新配置默认角色为 DeepSeek-chan（大肥鱼）；已有角色选择继续保留。大肥鱼资源由私有库或本机路径提供，公开包不附带模型。若保存的私有角色在当前电脑尚未安装，聊天仍可使用，并显示资源提示；在角色调试中选择已安装角色即可恢复桌宠。
 
 ## 共享 dsh 配置，独立管理 Agent
 
@@ -81,6 +81,14 @@ DeepSeek-chan（大肥鱼）：原画及拆分 神宫凉子，Live2D 建模 霓�
 node scripts/import-deepseek.mjs "模型压缩包解压目录"
 ```
 
+## 自行设置本机模型路径
+
+在“更多 → 角色调试”选择已登记角色，在“本机模型路径”中点击“浏览文件”，选中该角色的 `.model3.json`，再点击“应用路径”。也可直接粘贴完整路径。程序检查模型名称、moc、纹理、表情、动作和物理文件后立即加载；重启继续使用该路径。
+
+请先解压完整模型包，保留 `.model3.json` 周围的资源目录。只记录路径，不复制或上传文件；移动原目录后需更新路径。“恢复自动查找”重新使用私有库或原缓存。路径记录位于 `DSH_HOME/peko-pet/model-paths.json`，多个安装版本共用。
+
+当前可设置大肥鱼、Yumi、冰糖、艾莲、草莓兔兔。新角色请提供完整模型目录及作者说明，逐个加入固定目录并适配表情。公开版不开放任意模型导入；此类应用发布前需要 [Live2D 可扩展应用审核与发布许可](https://www.live2d.com/en/sdk/license/expandable/)。
+
 ## 即时角色控制
 
 模型可在正文流插入短标记：
@@ -103,11 +111,12 @@ npm test
 npm run typecheck
 npm run build
 npm run check:ui
+npm run check:avatar
 node scripts/smoke-agent.mjs
 npm run package:windows
 ```
 
-离屏检查使用真实隐藏 Electron 窗口、隔离 DSH_HOME、持久测试 userData、脚本模型和临时项目，不移动系统鼠标、不抢焦点、不注册托盘或全局快捷键。覆盖连续启动、重启、配置重载、原始聊天组件、工具、审批、提问、停止、记忆、历史和真实 WebGL 模型。截图及报告保存在忽略的 `work/electron-checks`。
+`check:avatar` 需要本机已安装三款测试角色，逐个播放动作并检查 WebGL 恢复；不运行长稳。离屏检查使用真实隐藏 Electron 窗口、隔离 DSH_HOME、持久测试 userData、脚本模型和临时项目，不移动系统鼠标、不抢焦点、不注册托盘或全局快捷键。覆盖连续启动、重启、配置重载、原始聊天组件、工具、审批、提问、停止、记忆、历史和真实 WebGL 模型。截图及报告保存在忽略的 `work/electron-checks`。
 
 `smoke-agent` 检查运行时启动与共享配置；`e2e-agent` 和 `e2e-work` 使用当前真实模型，会消耗额度。可通过 `PEKO_TEST_PROVIDER` 与 `PEKO_TEST_MODEL` 选择已有测试路由。
 

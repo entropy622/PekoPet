@@ -32,8 +32,8 @@ test('missing resources and escaping references are rejected before import',t=>{
 });
 
 test('local character selection requires its import and preserves existing character settings',async t=>{
-  const f=fixture(t);mkdirSync(join(f.target,'plugin'),{recursive:true});mkdirSync(join(f.target,'assets'));
-  for(const file of ['state.mjs','model-path.mjs'])copyFileSync('plugin/'+file,join(f.target,'plugin',file));copyFileSync('assets/avatars.json',join(f.target,'assets/avatars.json'));
+  const f=fixture(t),previousHome=process.env.DSH_HOME;process.env.DSH_HOME=join(f.root,'isolated home');t.after(()=>{if(previousHome===undefined)delete process.env.DSH_HOME;else process.env.DSH_HOME=previousHome;});mkdirSync(join(f.target,'plugin'),{recursive:true});mkdirSync(join(f.target,'assets'));
+  for(const file of ['state.mjs','model-path.mjs','model-locations.ts'])copyFileSync('plugin/'+file,join(f.target,'plugin',file));copyFileSync('assets/avatars.json',join(f.target,'assets/avatars.json'));
   const {State}=await import(pathToFileURL(join(f.target,'plugin/state.mjs')).href);
   const state=new State(join(f.target,'state.sqlite3'));
   try{

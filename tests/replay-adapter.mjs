@@ -57,6 +57,7 @@ export function apply(ctx){
         if(last==='schedule'&&!options.messages.some(m=>m.role==='tool'&&m.toolCallId==='fixture-schedule')){yield* toolCall('fixture-schedule','schedule_create',{title:'喝水提醒',prompt:'提醒用户喝水',after_seconds:2});return;}
         text=reminder?'提醒到了，喝点水吧。':'[[peko:{"mix":{"星星眼":0.8},"hold":1000}]]你好，我是 Peko。';
       }
+      if(last==='avatar-invalid-then-valid')text='[[peko:{"mix":{"unknown-expression":1}}]][[peko:{"mix":{"星星眼":0.8},"hold":5000}]]继续微笑。';
       yield {type:'block-start',index:0,blockType:'text'};
       for(const char of text){if(last==='avatar-live'&&char==='你')await setTimeout(1500,undefined,{signal:options.signal});if(last==='cancel')await setTimeout(80,undefined,{signal:options.signal});yield{type:'text-delta',index:0,text:char};}
       yield{type:'block-end',index:0,block:{type:'text',text}};

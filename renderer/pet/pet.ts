@@ -38,7 +38,8 @@ class Avatar extends CubismUserModel {
       const texture=gl.createTexture();if(!texture)throw new Error('纹理分配失败');gl.bindTexture(gl.TEXTURE_2D,texture);gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,1);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,image);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);renderer.bindTexture(i,texture);
     }
     for(const [name,file]of Object.entries(descriptor.expressions)){const data=JSON.parse(new TextDecoder().decode(await bytes(file as string)));this.expressions.set(name,{parameters:data.Parameters||[],weight:0,target:0});}
-    for(const [name,file]of Object.entries(descriptor.motions)){const data=await bytes(file as string);this.motions.set(name,this.loadMotion(data,data.byteLength,name));}
+    const eyeIds=Array.from({length:settings.getEyeBlinkParameterCount()},(_,i)=>settings.getEyeBlinkParameterId(i)),lipIds=Array.from({length:settings.getLipSyncParameterCount()},(_,i)=>settings.getLipSyncParameterId(i));
+    for(const [name,file]of Object.entries(descriptor.motions)){const data=await bytes(file as string),motion=this.loadMotion(data,data.byteLength,name);if(!motion)throw new Error('无法加载动作：'+name);motion.setEffectIds(eyeIds,lipIds);this.motions.set(name,motion);}
     const parameters=[];
     for(let i=0;i<this._model.getParameterCount();i++){const id=this._model.getParameterId(i).getString();if(!descriptor.avatar.excludedParameters?.includes(id)&&(descriptor.metadata.parameters.includes(id)||descriptor.avatar.parameters?.includes(id)))parameters.push({id,min:this._model.getParameterMinimumValue(i),max:this._model.getParameterMaximumValue(i),default:this._model.getParameterDefaultValue(i)});}
     const layers=Object.keys(descriptor.expressions).filter(name=>descriptor.avatar.layers.includes(name));
@@ -46,6 +47,8 @@ class Avatar extends CubismUserModel {
     this.resize();for(let i=0;i<60;i++)this.update(1/60);this.draw();
     return {parameters:this._model.getParameterCount(),drawables:this._model.getDrawableCount(),clippingGroups:groups.size,maskBuffers:buffers};
   }
+  inspect(){const parameters:Record<string,number>={};for(let i=0;i<this._model.getParameterCount();i++)parameters[this._model.getParameterId(i).getString()]=this._model.getParameterValueByIndex(i);return {parameters,clock:this.clock,mix:this.mix,layers:[...this.layers],visible:this.visible,scale:this.scale,weights:Object.fromEntries([...this.expressions].map(([name,value])=>[name,value.weight])),motionFinished:this._motionManager.isFinished(),contextLost:this.gl.isContextLost()};}
+  step(seconds:number){for(let i=0;i<Math.ceil(seconds*60);i++)this.update(1/60);this.draw();const pixels=new Uint8Array(this.canvas.width*this.canvas.height*4);this.gl.readPixels(0,0,this.canvas.width,this.canvas.height,this.gl.RGBA,this.gl.UNSIGNED_BYTE,pixels);let visible=0;for(let i=3;i<pixels.length;i+=4)if(pixels[i]>20)visible++;return {...this.inspect(),visiblePixels:visible};}
   resize(){this.canvas.width=Math.round(innerWidth*devicePixelRatio);this.canvas.height=Math.round(innerHeight*devicePixelRatio);this.setRenderTargetSize(this.canvas.width,this.canvas.height);}
   cue(cue:Cue){
     if(cue.clear){this.layers.clear();this.mix={};this.params={};this._motionManager.stopAllMotions();this.defaults();}
@@ -84,7 +87,10 @@ async function start(){
   const option=new Option();option.logFunction=message=>console.info('[Cubism]',message);CubismFramework.startUp(option);CubismFramework.initialize();
   const descriptor=await window.peko.invoke('avatar_descriptor');const avatar=new Avatar(),canvas=document.querySelector<HTMLCanvasElement>('#pet')!;
   const stats=await avatar.initialize(descriptor,canvas);
-  await window.peko.listen('avatar-cue',({payload})=>{avatar.cue(payload.cue);avatar.update(1/60);avatar.draw();void window.peko.invoke('avatar_applied',{sentAt:payload.sentAt});});
+  const failure=(error:unknown)=>{avatar.cancel();void window.peko.invoke('avatar_error',{message:'角色渲染失败：'+String(error instanceof Error?error.message:error)});};
+  await window.peko.listen('avatar-cue',({payload})=>{try{avatar.cue(payload.cue);avatar.update(1/60);avatar.draw();void window.peko.invoke('avatar_applied',{sentAt:payload.sentAt,source:payload.source,cue:payload.cue});}catch(error){failure(error);}});
+  canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();void window.peko.invoke('avatar_error',{message:'显卡上下文已丢失，正在恢复角色',recovering:true});});
+  canvas.addEventListener('webglcontextrestored',()=>location.reload());
   await window.peko.listen('avatar-state',({payload})=>payload.cancel?avatar.cancel():avatar.restore(payload.layers||{}));
   await window.peko.listen('avatar-settings',({payload})=>{avatar.scale=payload.scale||1;avatar.activeUntil=performance.now()+2000;});
   await window.peko.listen('avatar-gaze',({payload})=>{if(Math.abs(payload.x-avatar.gaze.x)+Math.abs(payload.y-avatar.gaze.y)>.02)avatar.activeUntil=performance.now()+250;avatar.gaze=payload;avatar.visible=payload.visible;});
@@ -96,8 +102,9 @@ async function start(){
   canvas.addEventListener('pointerup',()=>{if(pointer&&!moved)void window.peko.invoke('pet_click');pointer=null;});
   canvas.addEventListener('wheel',event=>{event.preventDefault();void window.peko.invoke('pet_scale',{delta:event.deltaY});},{passive:false});
   window.addEventListener('resize',()=>avatar.resize());
-  const frame=(now:number)=>{const interval=now<avatar.activeUntil?1000/60:1000/30;if((avatar.visible||descriptor.test)&&now-avatar.last>=interval){avatar.update(Math.min(.1,(now-avatar.last)/1000));avatar.last=now;avatar.draw();}else if(!avatar.visible)avatar.last=now;requestAnimationFrame(frame);};requestAnimationFrame(frame);
+  const frame=(now:number)=>{requestAnimationFrame(frame);if(avatar.gl.isContextLost())return;try{const interval=now<avatar.activeUntil?1000/60:1000/30;if((avatar.visible||descriptor.test)&&now-avatar.last>=interval){avatar.update(Math.min(.1,(now-avatar.last)/1000));avatar.last=now;avatar.draw();}else if(!avatar.visible)avatar.last=now;}catch(error){failure(error);}};requestAnimationFrame(frame);
   window.addEventListener('beforeunload',()=>{avatar.release();CubismFramework.dispose();CubismFramework.cleanUp();});
-  if(descriptor.test)window.__pekoAvatarTest={stats,catalog:avatar.catalog,debug:()=>({matrix:[...avatar.getModelMatrix().getArray()],glError:avatar.gl.getError(),opacity:avatar.getOpacity()}),capture:(cue:Cue={},steps=90)=>{avatar.cue({...cue,hold:60000});for(let i=0;i<steps;i++)avatar.update(1/60);avatar.draw();return canvas.toDataURL('image/png');},portrait:()=>avatar.portrait(),release:()=>{avatar.cancel();avatar.restore({});for(let i=0;i<90;i++)avatar.update(1/60);avatar.draw();return canvas.toDataURL('image/png');}};
+  const contextControl=descriptor.test?avatar.gl.getExtension('WEBGL_lose_context'):null;
+  if(descriptor.test)window.__pekoAvatarTest={stats,catalog:avatar.catalog,inspect:()=>avatar.inspect(),image:()=>canvas.toDataURL('image/png'),step:(seconds:number)=>avatar.step(seconds),act:(cue:Cue)=>avatar.cue(cue),loseContext:()=>{contextControl?.loseContext();return !!contextControl;},restoreContext:()=>contextControl?.restoreContext(),debug:()=>({matrix:[...avatar.getModelMatrix().getArray()],glError:avatar.gl.getError(),opacity:avatar.getOpacity()}),capture:(cue:Cue={},steps=90)=>{avatar.cue({...cue,hold:60000});for(let i=0;i<steps;i++)avatar.update(1/60);avatar.draw();return canvas.toDataURL('image/png');},portrait:()=>avatar.portrait(),release:()=>{avatar.cancel();avatar.restore({});for(let i=0;i<90;i++)avatar.update(1/60);avatar.draw();return canvas.toDataURL('image/png');}};
 }
 void start().catch(error=>{console.error(error);const box=document.querySelector<HTMLElement>('#error')!;box.style.display='block';box.textContent=String(error);void window.peko.invoke('avatar_error',{message:String(error)});});

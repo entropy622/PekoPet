@@ -1,15 +1,13 @@
 import {existsSync,readFileSync} from 'node:fs';
 import {join,resolve} from 'node:path';
 import {homedir} from 'node:os';
+import {resolveModelFile} from './model-locations.ts';
 
 const project=resolve(import.meta.dirname,'..');
 export const avatars=JSON.parse(readFileSync(new URL('../assets/avatars.json',import.meta.url),'utf8')).avatars;
 
 export function modelPath(id,{root=project,home=process.env.DSH_HOME||join(homedir(),'.dsh')}={}){
-  const avatar=avatars[id];if(!avatar)throw new Error('未知角色：'+id);
-  const library=join(root,'models',avatar.library||avatar.model);
-  if(avatar.source==='library'||existsSync(library))return library;
-  return avatar.source==='local'?join(root,'local/models',avatar.model):join(home,'peko-pet/models/LLM_Live2D/public/live2D',avatar.model);
+  return resolveModelFile(root,home,id,avatars);
 }
 
 export function requireModel(id,options){

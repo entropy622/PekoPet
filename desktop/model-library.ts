@@ -1,11 +1,10 @@
 import {existsSync,readFileSync,readdirSync,realpathSync} from 'node:fs';
 import {dirname,join,resolve,relative,isAbsolute} from 'node:path';
+import {resolveModelFile} from '../plugin/model-locations.ts';
 
 export function modelFile(root:string,home:string,id:string){
-  const avatar=JSON.parse(readFileSync(join(root,'assets/avatars.json'),'utf8')).avatars[id];
-  if(!avatar)throw new Error('未知角色');
-  const library=join(root,'models',avatar.library||avatar.model);
-  const file=avatar.source==='library'||existsSync(library)?library:avatar.source==='local'?join(root,'local/models',avatar.model):join(home,'peko-pet/models/LLM_Live2D/public/live2D',avatar.model);
+  const avatars=JSON.parse(readFileSync(join(root,'assets/avatars.json'),'utf8')).avatars;
+  const file=resolveModelFile(root,home,id,avatars);
   if(!existsSync(file))throw new Error('角色资源未安装。请运行 npm run assets，或获取私有 models submodule。');
   return file;
 }

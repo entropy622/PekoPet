@@ -5,6 +5,7 @@ import {homedir} from 'node:os';
 import {Runtime} from '../desktop/runtime.ts';
 import {modelDescriptor,modelFile,confinedFile} from '../desktop/model-library.ts';
 import {StreamCues,validateCue,type Catalog,type Cue} from '../desktop/cues.ts';
+import {readModelLocations,setModelLocation} from '../plugin/model-locations.ts';
 import {renderIndex} from '../desktop/render-index.ts';
 
 const test=process.argv.includes('--peko-test');
@@ -14,7 +15,7 @@ const home=process.env.DSH_HOME||join(homedir(),'.dsh');
 if(process.env.PEKO_USER_DATA)app.setPath('userData',process.env.PEKO_USER_DATA);
 app.setName('PekoPet');
 protocol.registerSchemesAsPrivileged([{scheme:'peko-app',privileges:{standard:true,secure:true,supportFetchAPI:true,corsEnabled:true,stream:true}}]);
-const state:any={status:'正在启动助手',connected:false,home,runtime:'PekoPet',settings:{},catalog:{name:'',expressions:[],layers:[],motions:[],parameters:[]},avatarState:{layers:{}},sessionId:'',busy:false,error:'',avatarError:'',latencies:[]};
+const state:any={status:'正在启动助手',connected:false,home,runtime:'PekoPet',settings:{},catalog:{name:'',expressions:[],layers:[],motions:[],parameters:[]},avatarState:{layers:{}},sessionId:'',busy:false,error:'',avatarError:'',latencies:[],modelPaths:{},modelFile:'',semanticApplied:0,lastAvatarEvent:null};
 let chat:BrowserWindow,pet:BrowserWindow,runtime:Runtime,tray:Tray|undefined,quitting=false,stopping:Promise<void>|undefined;
 let activeAvatar='',petReady=false,generation=0,firstTokenAt=0,semantic=false;
 const streams=new StreamCues();
@@ -25,15 +26,20 @@ function iconPath(){return join(home,'peko-pet/icons',activeAvatar+'-head.png');
 function refreshIcon(){const file=iconPath();if(!existsSync(file))return;const icon=nativeImage.createFromPath(file);chat.setIcon(icon);tray?.setImage(icon.resize({width:24,height:24}));send('peko-portrait',{});}
 function notify(body:string){if(!test&&!state.settings.dnd&&Notification.isSupported()){const notification=new Notification({title:'PekoPet',body,icon:existsSync(iconPath())?iconPath():undefined});notification.on('click',()=>showChat());notification.show();}}
 function showChat(){if(!chat||chat.isDestroyed())return;if(!test){chat.show();chat.focus();}}
-function applyCue(value:Cue){
-  const cue=validateCue(value,state.catalog as Catalog);semantic=true;
+function applyCue(value:Cue,source='debug'){
+  const cue=validateCue(value,state.catalog as Catalog);if(petReady)state.avatarError='';if(source==='assistant')semantic=true;
   if(cue.clear)state.avatarState.layers={};for(const [name,on]of Object.entries(cue.layers||{}))state.avatarState.layers[name]=on;
   if(state.sessionId&&(cue.clear||cue.layers))void runtime.call('peko.avatar',{sessionId:state.sessionId,catalog:state.catalog,state:state.avatarState}).catch(fail);
-  if(petReady)pet.webContents.send('avatar-cue',{cue,sentAt:Date.now()});publish();
+  if(petReady)pet.webContents.send('avatar-cue',{cue,sentAt:Date.now(),source});publish();
 }
-function local(status:string){const parameter=state.catalog.parameters.find((p:any)=>['ParamAngleZ','AngleZ'].includes(p.id));if(parameter&&petReady)pet.webContents.send('avatar-cue',{cue:{params:{[parameter.id]:parameter.default+({thinking:6,working:3,waiting:-6}[status]||0)},hold:10000},sentAt:Date.now()});}
+function local(status:string){const parameter=state.catalog.parameters.find((p:any)=>['ParamAngleZ','AngleZ'].includes(p.id));if(parameter&&petReady)pet.webContents.send('avatar-cue',{cue:{params:{[parameter.id]:parameter.default+({thinking:6,working:3,waiting:-6}[status]||0)},hold:10000},sentAt:Date.now(),source:'status'});}
 function onRuntimeEvent(method:string,p:any){
-  if(method==='peko.stream'&&p.sessionId===state.sessionId){try{if(p.frame.type==='chunk'&&!state.firstTokenMs)state.firstTokenMs=Date.now()-firstTokenAt;for(const cue of streams.accept(p.frame))applyCue(cue);if(p.frame.type==='end'&&(p.frame.outcome?.kind==='abandoned'||p.frame.outcome?.eventType==='assistant/attempt'))send('avatar-state',{cancel:true});}catch(error){streams.reset();send('avatar-state',{cancel:true});fail(error);}}
+  if(method==='peko.stream'&&p.sessionId===state.sessionId){
+    if(p.frame.type==='chunk'&&!state.firstTokenMs)state.firstTokenMs=Date.now()-firstTokenAt;
+    let cues:Cue[]=[];try{cues=streams.accept(p.frame);}catch(error){streams.reset();send('avatar-state',{cancel:true});fail(error);}
+    for(const cue of cues){try{applyCue(cue,'assistant');}catch(error){state.avatarError=String((error as Error).message||error);}}
+    if(p.frame.type==='end'&&(p.frame.outcome?.kind==='abandoned'||p.frame.outcome?.eventType==='assistant/attempt'))send('avatar-state',{cancel:true});
+  }
   if(method==='session.status'&&p.sessionId===state.sessionId){const before=state.busy;state.busy=p.status==='running';if(state.busy&&!before){state.error='';state.status='正在思考';firstTokenAt=Date.now();state.firstTokenMs=0;semantic=false;local('thinking');}else if(!state.busy){streams.reset();state.status='在你身边';if(before){if(!semantic)local('done');notify('这件事处理好了，点我查看。');}}}
   if(method==='peko.waiting'&&p.sessionId===state.sessionId){state.status='等你决定';local('waiting');notify('需要你做个决定，点我查看。');}
   if(method==='peko.memory.changed')send('peko-memory',p);
@@ -52,11 +58,11 @@ async function startRuntime(){
   runtime.on('event',(method,p)=>{if(current===generation)onRuntimeEvent(method,p);});
   runtime.on('stopped',(error)=>{if(current===generation&&!quitting&&!runtime.closing){state.connected=false;state.busy=false;state.status='助手已停止';send('avatar-state',{cancel:true});fail(error);}});
   await runtime.ready;state.settings=await runtime.call('peko.settings');state.connected=true;state.error='';state.status='在你身边';publish();
-  if(petReady)await runtime.call('peko.avatar',{sessionId:state.sessionId||'peko-catalog',catalog:state.catalog,state:state.avatarState});applyWindowSettings();await chat.loadURL('peko-app://app/');void loadPet(state.settings.avatar||'yumi').catch(error=>{state.avatarError=String(error.message||error);publish();});
+  if(petReady)await runtime.call('peko.avatar',{sessionId:state.sessionId||'peko-catalog',catalog:state.catalog,state:state.avatarState});state.modelPaths=readModelLocations(home);applyWindowSettings();await chat.loadURL('peko-app://app/');void loadPet(state.settings.avatar||'deepseek').catch(error=>{state.avatarError=String(error.message||error);publish();});
 }
-async function loadPet(id:string){
-  if(activeAvatar===id&&petReady)return;
-  modelFile(root,home,id);if(activeAvatar&&activeAvatar!==id){state.avatarState={layers:{}};if(state.sessionId)await runtime.call('peko.avatar',{sessionId:state.sessionId,catalog:state.catalog,state:state.avatarState});}activeAvatar=id;petReady=false;
+async function loadPet(id:string,force=false){
+  if(activeAvatar===id&&petReady&&!force)return;
+  state.modelFile=modelFile(root,home,id);if(activeAvatar&&activeAvatar!==id){state.avatarState={layers:{}};if(state.sessionId)await runtime.call('peko.avatar',{sessionId:state.sessionId,catalog:state.catalog,state:state.avatarState});}activeAvatar=id;petReady=false;
   await pet.loadURL('peko-app://pet/?avatar='+encodeURIComponent(id));refreshIcon();
 }
 function visibleBounds(bounds:any){const display=screen.getDisplayMatching(bounds),area=display.workArea;return {...bounds,x:Math.max(area.x,Math.min(bounds.x,area.x+area.width-bounds.width)),y:Math.max(area.y,Math.min(bounds.y,area.y+area.height-bounds.height))};}
@@ -73,12 +79,22 @@ ipcMain.handle('peko:invoke',async(event,command:string,args:any={})=>{
   if(command==='avatar_descriptor'&&isPet)return {...modelDescriptor(root,home,activeAvatar),test};
   if(command==='avatar_ready'&&isPet){if(args.id!==activeAvatar)return;state.catalog=args.catalog;state.avatarError='';petReady=true;await runtime.call('peko.avatar',{sessionId:state.sessionId||'peko-catalog',catalog:state.catalog});send('avatar-settings',{scale:state.settings.petScale||1});send('avatar-state',{layers:state.avatarState.layers});publish();return;}
   if(command==='avatar_portrait'&&isPet){if(args.id!==activeAvatar)return;const data=Buffer.from(args.png.split(',')[1],'base64');if(data.length>4*1024*1024)throw new Error('头像过大');mkdirSync(dirname(iconPath()),{recursive:true});writeFileSync(iconPath(),data);writeFileSync(iconPath().replace(/\.png$/,'.json'),JSON.stringify({avatar:activeAvatar,author:modelDescriptor(root,home,activeAvatar).avatar.author,source:'Local Cubism Web portrait'}));refreshIcon();return;}
-  if(command==='avatar_applied'&&isPet){state.latencies.push(Math.max(0,Date.now()-args.sentAt));state.latencies=state.latencies.slice(-200);publish();return;}
-  if(command==='avatar_error'&&isPet){state.avatarError=args.message;publish();return;}
+  if(command==='avatar_applied'&&isPet){state.lastAvatarEvent={source:args.source,cue:args.cue};if(args.source==='assistant')state.semanticApplied++;state.latencies.push(Math.max(0,Date.now()-args.sentAt));state.latencies=state.latencies.slice(-200);publish();return;}
+  if(command==='avatar_error'&&isPet){if(args.recovering)petReady=false;state.avatarError=args.message;publish();return;}
   if(command==='pet_click'&&isPet){showChat();return;}
   if(command==='pet_move'&&isPet){const position=pet.getPosition(),bounds=visibleBounds({...pet.getBounds(),x:position[0]+Math.round(args.x),y:position[1]+Math.round(args.y)});pet.setBounds(bounds);state.settings={...state.settings,petX:bounds.x,petY:bounds.y};await runtime.call('peko.settings',{patch:{petX:bounds.x,petY:bounds.y}});return;}
   if(command==='pet_scale'&&isPet){const scale=Math.max(.1,Math.min(4,(state.settings.petScale||1)*Math.exp(-args.delta*.001)));state.settings=await runtime.call('peko.settings',{patch:{petScale:scale}});send('avatar-settings',{scale});publish();return;}
   if(isPet)throw new Error('桌宠无权访问此操作');
+  if(command==='avatar_pick'){
+    const avatars=JSON.parse(readFileSync(join(root,'assets/avatars.json'),'utf8')).avatars;if(!avatars[args.id])throw new Error('未知角色');
+    if(test)return process.env.PEKO_TEST_MODEL||null;
+    const result=await dialog.showOpenDialog(chat,{title:'选择 '+avatars[args.id].name+' 的 model3.json',properties:['openFile'],filters:[{name:'Live2D 模型',extensions:['json']}]});return result.canceled?null:result.filePaths[0];
+  }
+  if(command==='avatar_location'){
+    state.modelPaths=setModelLocation(home,args.id,args.path,JSON.parse(readFileSync(join(root,'assets/avatars.json'),'utf8')).avatars);
+    try{if(args.id===state.settings.avatar)await loadPet(args.id,true);}catch(error){state.avatarError=String((error as Error).message||error);publish();throw error;}
+    publish();return state.modelPaths;
+  }
   if(command==='peko_state')return state;
   if(command==='peko_cue'){applyCue(args.cue);return;}
   if(command==='peko_activate'){state.sessionId=args.sessionId;streams.reset();const result=await runtime.call('peko.open',{sessionId:args.sessionId});const saved=(await runtime.call('peko.history',{sessionId:args.sessionId})).avatarState;state.avatarState={...saved,layers:saved.layers||{}};await runtime.call('peko.avatar',{sessionId:args.sessionId,catalog:state.catalog,state:state.avatarState});send('avatar-state',{layers:state.avatarState.layers});publish();return result;}

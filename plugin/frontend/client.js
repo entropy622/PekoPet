@@ -120,9 +120,40 @@ function Portrait({ size = 36, rev = 0 }) {
   }, []);
   return h("img", { className: "peko-portrait", src: "/peko/portrait.png?v=" + fresh, alt: "\u89D2\u8272\u5934\u50CF", draggable: false, width: size, height: size });
 }
+function ModelLocation({ id, state, run }) {
+  const [path, setPath] = useState(state.modelPaths?.[id] || "");
+  return h(
+    Card,
+    null,
+    h("h2", null, "\u672C\u673A\u6A21\u578B\u8DEF\u5F84"),
+    state.modelFile ? h("p", { className: "peko-meta" }, "\u5F53\u524D\u6587\u4EF6\uFF1A" + state.modelFile) : null,
+    h(Field, { label: "\u6A21\u578B\u6587\u4EF6\u8DEF\u5F84", value: path, placeholder: "\u9009\u62E9\u6B64\u89D2\u8272\u7684 .model3.json \u6587\u4EF6", onChange: (e) => setPath(e.target.value) }),
+    h("p", { className: "peko-meta" }, "\u4FDD\u7559\u5B8C\u6574\u89E3\u538B\u76EE\u5F55\uFF1B\u53EA\u8BB0\u5F55\u8DEF\u5F84\uFF0C\u4E0D\u590D\u5236\u6216\u4E0A\u4F20\u6A21\u578B\u3002"),
+    h(
+      "div",
+      { className: "peko-actions" },
+      h(Button, { onClick: () => run(async () => {
+        const file = await invoke("avatar_pick", { id });
+        if (file) setPath(file);
+      }) }, "\u6D4F\u89C8\u6587\u4EF6"),
+      h(Button, { primary: true, disabled: !path.trim(), onClick: () => run(async () => {
+        const paths2 = await invoke("avatar_location", { id, path });
+        setPath(paths2[id] || "");
+      }, "\u6A21\u578B\u8DEF\u5F84\u5DF2\u4FDD\u5B58") }, "\u5E94\u7528\u8DEF\u5F84"),
+      h(Button, { onClick: () => run(async () => {
+        await invoke("avatar_location", { id, path: "" });
+        setPath("");
+      }, "\u5DF2\u6062\u590D\u81EA\u52A8\u67E5\u627E") }, "\u6062\u590D\u81EA\u52A8\u67E5\u627E")
+    )
+  );
+}
 function CompanionPanel({ tab, state, run, onChat }) {
   const [memories, setMemories] = useState([]), [draft, setDraft] = useState(""), [editing, setEditing] = useState(null), [persona, setPersona] = useState(state.settings?.persona || ""), [mix, setMix] = useState({}), [params, setParams] = useState({}), [clearing, setClearing] = useState(false);
   const settings = state.settings || {}, catalog = state.catalog || {};
+  useEffect(() => {
+    setMix({});
+    setParams({});
+  }, [settings.avatar]);
   useEffect(() => {
     if (tab !== "memory") return;
     let live = true, off;
@@ -193,7 +224,8 @@ function CompanionPanel({ tab, state, run, onChat }) {
     "div",
     { className: "peko-panel-content" },
     h("header", null, h("h1", null, "\u8BA9\u6BCF\u4E2A\u8868\u60C5\u90FD\u521A\u521A\u597D"), h("p", null, "\u8868\u60C5\u53EF\u6DF7\u5408\uFF0C\u59FF\u52BF\u4E0E\u9053\u5177\u4F1A\u5EF6\u7EED\u5230\u660E\u786E\u5173\u95ED\u3002")),
-    h(Card, null, h("div", { className: "peko-row" }, h("h2", null, catalog.name || "\u6B63\u5728\u52A0\u8F7D\u89D2\u8272"), h("label", null, "\u89D2\u8272 ", h("select", { "aria-label": "\u89D2\u8272", value: settings.avatar || "yumi", onChange: (e) => update({ avatar: e.target.value }) }, Object.entries(avatars_default.avatars).map(([id, avatar]) => h("option", { key: id, value: id }, avatar.name))))), h("p", { className: "peko-meta" }, "\u5207\u6362\u89D2\u8272\u540E\u7ACB\u5373\u751F\u6548\u3002"), h("div", { className: "peko-grid" }, (catalog.expressions || []).map((name) => h("label", { key: name, className: "peko-range" }, h("span", null, name), h("input", { type: "range", min: 0, max: 1, step: 0.05, value: mix[name] || 0, "aria-label": name, onChange: (e) => setMix({ ...mix, [name]: Number(e.target.value) }) }), h("output", null, (mix[name] || 0).toFixed(2))))), h(Button, { primary: true, onClick: () => cue({ mix, hold: 2500 }) }, "\u9884\u89C8\u6DF7\u5408\u8868\u60C5")),
+    h(Card, null, h("div", { className: "peko-row" }, h("h2", null, catalog.name || "\u6B63\u5728\u52A0\u8F7D\u89D2\u8272"), h("label", null, "\u89D2\u8272 ", h("select", { "aria-label": "\u89D2\u8272", value: settings.avatar || "deepseek", onChange: (e) => update({ avatar: e.target.value }) }, Object.entries(avatars_default.avatars).map(([id, avatar]) => h("option", { key: id, value: id }, avatar.name))))), h("p", { className: "peko-meta" }, "\u5207\u6362\u89D2\u8272\u540E\u7ACB\u5373\u751F\u6548\u3002"), h("div", { className: "peko-grid" }, (catalog.expressions || []).map((name) => h("label", { key: name, className: "peko-range" }, h("span", null, name), h("input", { type: "range", min: 0, max: 1, step: 0.05, value: mix[name] || 0, "aria-label": name, onChange: (e) => setMix({ ...mix, [name]: Number(e.target.value) }) }), h("output", null, (mix[name] || 0).toFixed(2))))), h(Button, { primary: true, onClick: () => cue({ mix, hold: 2500 }) }, "\u9884\u89C8\u6DF7\u5408\u8868\u60C5")),
+    h(ModelLocation, { key: settings.avatar, id: settings.avatar, state, run }),
     h(Card, null, h("h2", null, "\u6301\u7EED\u59FF\u52BF\u4E0E\u9053\u5177"), h("div", { className: "peko-actions" }, (catalog.layers || []).map((name) => {
       const active = state.avatarState?.layers?.[name] === true;
       return h(Button, { key: name, "aria-pressed": active, onClick: () => cue({ layers: { [name]: !active } }) }, name);
@@ -204,7 +236,7 @@ function CompanionPanel({ tab, state, run, onChat }) {
       setParams({ ...params, [p.id]: value });
       cue({ params: { [p.id]: value }, hold: 1200 });
     } }), h("output", null, (params[p.id] ?? p.default).toFixed(2)))))),
-    h(Card, null, h("div", { className: "peko-row" }, h("p", null, "\u672C\u5730\u89D2\u8272\u54CD\u5E94 P95 \xB7 " + p95), h(Button, { onClick: () => {
+    h(Card, null, h("div", { className: "peko-row" }, h("div", null, h("p", null, "\u672C\u5730\u89D2\u8272\u54CD\u5E94 P95 \xB7 " + p95), h("p", { className: "peko-meta" }, "\u5DF2\u64AD\u653E\u5BF9\u8BDD\u8868\u73B0\uFF1A" + (state.semanticApplied || 0) + " \u6B21"), state.lastAvatarEvent ? h("p", { className: "peko-meta" }, ({ assistant: "\u5BF9\u8BDD", debug: "\u624B\u52A8\u8C03\u8BD5", status: "\u672C\u5730\u72B6\u6001" }[state.lastAvatarEvent.source] || "\u89D2\u8272") + " \xB7 " + [...Object.keys(state.lastAvatarEvent.cue?.mix || {}), ...Object.keys(state.lastAvatarEvent.cue?.layers || {}), ...Object.keys(state.lastAvatarEvent.cue?.params || {}), state.lastAvatarEvent.cue?.motion].filter(Boolean).join("\u3001")) : null), h(Button, { onClick: () => {
       setMix({});
       setParams({});
       cue({ clear: true });
