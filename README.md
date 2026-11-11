@@ -12,17 +12,16 @@ Electron、TypeScript、React、Live2D Cubism Web 与自有 Agent Runtime 构成
 git clone https://github.com/entropy622/PekoPet.git
 cd PekoPet
 npm ci
-npm run assets
-npm run dev
+npm start
 ```
 
-`npm ci` 安装 Electron；`npm run dev` 增量构建并启动。只构建可运行 `npm run build`。也可双击根目录的 `start.bat`，脚本按自身位置定位工程，支持中文和空格路径。
+`npm ci` 安装 Electron；`npm start` 自动检查源码变化，仅在首次启动、构建缺失或源码更新后构建。`npm run dev` 强制构建后启动；只构建使用 `npm run build`。也可双击根目录的 `start.bat`，脚本按自身位置定位工程，支持中文和空格路径。启动不自动下载角色；已有大肥鱼模型可在角色调试中设置路径，公共评估角色可手动通过 `npm run assets` 缓存。
 
 Cubism Web 5-r.5 的 Framework、GLSL 着色器及清单允许的 Core 运行文件随源码提供，保留原许可；使用前请阅读 [Live2D 专有软件许可](https://www.live2d.com/eula/live2d-proprietary-software-license-agreement_en.html) 与 [开放软件许可](https://www.live2d.com/eula/live2d-open-software-license-agreement_en.html)。
 
 ## 使用便携版
 
-解压 Windows x64 ZIP，从托盘退出旧版 PekoPet，再运行 `start.bat` 或 `PekoPet.cmd`。首次启动缓存默认角色，后续可直接打开 `PekoPet.exe`。Electron、Chromium 和独立 Node 运行时随包提供，无需系统 WebView2。
+解压 Windows x64 ZIP，从托盘退出旧版 PekoPet，再运行 `start.bat` 或 `PekoPet.cmd`。启动直接打开应用，不联网下载模型，也不执行源码构建；也可直接打开 `PekoPet.exe`。Electron、Chromium 和独立 Node 运行时随包提供，无需系统 WebView2。
 
 从 Rust/Tauri 版本升级时，原 `DSH_HOME/peko-pet` 中的会话、记忆、人格和提醒继续使用。Electron 窗口偏好使用自己的 userData；旧版 WebView 的 cookie 不参与新应用启动。请先退出旧版，避免两个 Agent Runtime 同时操作同一会话。
 
@@ -114,9 +113,12 @@ npm run build
 npm run check:ui
 npm run check:avatar
 npm run check:exit
+npm run check:startup
 node scripts/smoke-agent.mjs
 npm run package:windows
 ```
+
+`check:startup` 在后台延迟初始化时检查桌宠与头像先行显示、启动前拖动保存及实际启动分段耗时。
 
 `check:exit` 启用真实注视轮询，并延迟后台关闭，检查三种退出路径且记录主进程异常。
 

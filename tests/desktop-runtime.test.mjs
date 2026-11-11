@@ -6,12 +6,14 @@ import {tmpdir} from 'node:os';
 import {pathToFileURL} from 'node:url';
 import {Runtime} from '../desktop/runtime.ts';
 
-test('desktop runtime serves bootstrap, binary bundles and cancellable streams over IPC without an HTTP listener',{timeout:180000},async t=>{
+test('desktop runtime serves private IPC and restores cold desktop sessions without the SDK handshake',{timeout:300000},async t=>{
   const home=mkdtempSync(join(tmpdir(),'peko-ipc-'));
-  mkdirSync(join(home,'profiles/desktop'),{recursive:true});writeFileSync(join(home,'profiles/desktop/cordis.patch.yml'),'- id: llm-deepseek-account\n  disabled: true\n');
+  const project=join(home,'project 中文');mkdirSync(project);
+  mkdirSync(join(home,'profiles/desktop'),{recursive:true});writeFileSync(join(home,'profiles/desktop/cordis.patch.yml'),'- id: llm-deepseek-account\n  disabled: true\n- id: agent-default-model\n  config: {provider: peko-test, model: replay}\n');
   const patch=join(home,'fixture.yml');writeFileSync(patch,`- insert:\n    - id: fixture-model\n      name: '${pathToFileURL(resolve('tests/replay-adapter.mjs')).href}'\n`);
   process.env.DSH_HOME=home;process.env.PEKO_AGENT_PATCH=patch;process.env.PEKO_NODE=process.execPath;
-  const runtime=new Runtime(resolve('.'),async()=>null);t.after(async()=>{await runtime.stop();rmSync(home,{recursive:true,force:true});});
+  let runtime=new Runtime(resolve('.'),async()=>null);t.after(async()=>{await runtime.stop();rmSync(home,{recursive:true,force:true});});
+  const preferences=await new Promise(resolve=>runtime.once('bootstrap',resolve));assert.equal(preferences.avatar,'deepseek');
   await runtime.ready;
   const boot=await runtime.call('host.boot');assert.equal(boot.transport,'ipc');assert.equal(boot.httpListening,false);assert.ok(boot.rows.some(r=>r.kind==='global'&&r.name==='__DSH_BOOT__'));
   const graph=boot.rows.find(r=>r.name==='__DSH_BOOT__').value;
@@ -20,5 +22,11 @@ test('desktop runtime serves bootstrap, binary bundles and cancellable streams o
   await runtime.call('host.stream.open',{id:'events',endpoint:'$events',payload:{args:{}}});
   const first=await runtime.call('host.stream.next',{id:'events'});assert.equal(first.value.type,'ready');
   await runtime.call('host.stream.cancel',{id:'events'});
+  await runtime.call('initialize',{provider:'peko-test',model:'replay',cwd:project});
+  assert.equal((await runtime.call('session/working-directory/get',{sessionId:'cold-open'})).cwd,project);
   await runtime.stop();assert.equal(runtime.child.exitCode,0);
+  runtime=new Runtime(resolve('.'),async()=>null);await runtime.ready;
+  await runtime.call('peko.open',{sessionId:'cold-open'});
+  assert.equal((await runtime.call('peko.capabilities',{sessionId:'cold-open'})).workingDirectory,project);
+  assert.deepEqual((await runtime.call('peko.history',{sessionId:'cold-open'})).messages,[]);
 });

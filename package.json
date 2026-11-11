@@ -1,13 +1,14 @@
 {
   "name": "pekopet",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "private": true,
   "type": "module",
   "engines": {
     "node": ">=24"
   },
   "scripts": {
-    "dev": "node scripts/launch-electron.mjs",
+    "dev": "node scripts/launch-electron.mjs --build",
+    "start": "node scripts/launch-electron.mjs",
     "build": "node scripts/build-electron.mjs",
     "check:ui": "node scripts/check-ui.mjs",
     "test": "node --test tests/*.test.mjs",
@@ -19,7 +20,8 @@
     "check:avatar": "node scripts/check-avatar-behavior.mjs",
     "check:viewport": "node scripts/check-pet-viewport.mjs",
     "check:rendering": "node scripts/check-pet-rendering.mjs",
-    "check:exit": "node scripts/check-exit.mjs"
+    "check:exit": "node scripts/check-exit.mjs",
+    "check:startup": "node scripts/check-startup.mjs"
   },
   "dependencies": {
     "@deepseek-ai/cordis": "4.0.5",

@@ -1,0 +1,8 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { modelDescriptor } from '../desktop/model-library.ts';
+test('model descriptor batches small JSON resources while keeping model confinement', t => { const root = mkdtempSync(join(tmpdir(), 'peko-assets-')); t.after(() => rmSync(root, { recursive: true, force: true })); const home = join(root, 'home'), base = join(root, 'models/yumi'); mkdirSync(join(root, 'assets'), { recursive: true }); mkdirSync(base, { recursive: true }); writeFileSync(join(root, 'assets/avatars.json'), JSON.stringify({ parameters: [], avatars: { yumi: { model: 'yumi/yumi.model3.json', excluded: [] } } })); writeFileSync(join(base, 'yumi.model3.json'), JSON.stringify({ FileReferences: { Moc: 'body.moc3', Textures: ['texture.png'], Physics: 'physics.json' } })); for (const name of ['physics.json', '笑.exp3.json', 'idle.motion3.json'])
+    writeFileSync(join(base, name), '{}'); const d = modelDescriptor(root, home, 'yumi'); assert.equal(d.expressions['笑'], '笑.exp3.json'); assert.equal(d.motions.idle, 'idle.motion3.json'); assert.deepEqual(d.jsonAssets, { 'physics.json': '{}', '笑.exp3.json': '{}', 'idle.motion3.json': '{}' }); const outside = join(root, 'outside'); mkdirSync(outside); writeFileSync(join(outside, 'physics.json'), '{}'); symlinkSync(outside, join(base, 'linked'), 'junction'); writeFileSync(join(base, 'yumi.model3.json'), JSON.stringify({ FileReferences: { Physics: 'linked/physics.json' } })); assert.throws(() => modelDescriptor(root, home, 'yumi'), /超出角色目录/); });

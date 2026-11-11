@@ -48,7 +48,7 @@ export function apply(ctx) {
     const agent=typeof params.sessionId==='string'?ctx.agents.get(params.sessionId):undefined;
     const tools=agent?ctx.tools.schemas(scopeOf(agent.ctx)).map(s=>({name:s.name,description:s.description})):[];
     const skills=agent?await ctx.skills.snapshot({scope:scopeOf(agent.ctx),cwd:await ctx.workingDirectory.ensure(agent)}):{skills:[],complete:false};
-    return {version:'0.2.3',protocol:1,home,runtime:{owner:'PekoPet',loopOwner:ctx.agentLoop.owner,transport:embedded?'ipc':'stdio'},sharedProfile:'desktop',defaultModel:ctx.get('agentDefaultModel')?.currentSelection(),workingDirectory:agent?await ctx.workingDirectory.ensure(agent):undefined,providers:await models(),settings:state.settings(),sessions:state.sessions(),tools,skills,features:['stream','cancel','approvals','questions','memory','avatar','schedule']};
+    return {version:'0.2.4',protocol:1,home,runtime:{owner:'PekoPet',loopOwner:ctx.agentLoop.owner,transport:embedded?'ipc':'stdio'},sharedProfile:'desktop',defaultModel:ctx.get('agentDefaultModel')?.currentSelection(),workingDirectory:agent?await ctx.workingDirectory.ensure(agent):undefined,providers:await models(),settings:state.settings(),sessions:state.sessions(),tools,skills,features:['stream','cancel','approvals','questions','memory','avatar','schedule']};
   }
   function avatarContext(id) {
     const a=avatars.get(id)??(avatarCatalog?{catalog:avatarCatalog,state:state.avatarState(id)}:undefined);
@@ -164,7 +164,12 @@ export function apply(ctx) {
     }
     if(method==='session/prompt')return prompt(p);
     if(method==='session/resume') {own(requiredString(p,'sessionId'));return controller.resume(p);}
-    if(method==='peko.open') {const id=requiredString(p,'sessionId');own(id);activeSession=id;return ctx.agents.get(id)?{}:controller.resume({sessionId:id});}
+    if(method==='peko.open') {
+      const id=requiredString(p,'sessionId');own(id);activeSession=id;
+      if(ctx.agents.get(id))return {};
+      if(embedded){const result=await ctx.get('sessionController').resolveAgent(id);if(result.error)throw result.error;return {};}
+      return controller.resume({sessionId:id});
+    }
     if(method==='peko.history'){const id=requiredString(p,'sessionId');return {messages:state.messages(id),avatarState:state.avatarState(id)};}
     if(method==='peko.sessions')return {sessions:state.sessions()};
     if(method==='peko.settings')return p.patch?state.updateSettings(p.patch):state.settings();

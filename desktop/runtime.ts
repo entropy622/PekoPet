@@ -21,6 +21,7 @@ export class Runtime extends EventEmitter {
       const timer=setTimeout(()=>reject(new Error('助手启动超时，日志：'+logPath)),120000);
       this.child.on('message',async(message:any)=>{
         message=decodePacket(message);
+        if(message?.type==='bootstrap')this.emit('bootstrap',message.settings);
         if(message?.type==='ready'){clearTimeout(timer);resolve();}
         if(message?.type==='response'){const pending=this.pending.get(message.id);if(pending){this.pending.delete(message.id);if(message.error){const error=Object.assign(new Error(message.error.message),message.error);pending.reject(error);}else pending.resolve(message.value);}}
         if(message?.type==='event')this.emit('event',message.method,message.params);

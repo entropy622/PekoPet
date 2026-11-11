@@ -17,8 +17,8 @@ function fixture(portable=false,fail=false){
   return{base,root,result,events:()=>readFileSync(log,'utf8').trim().split('\n').map(line=>JSON.parse(line))};
 }
 for(const portable of [false,true])test(`BAT locates the ${portable?'portable':'source'} project from its own Chinese/spaced path`,{skip:process.platform!=='win32'},()=>{
-  const f=fixture(portable);try{assert.equal(f.result.status,0,f.result.stdout+f.result.stderr);const events=f.events();assert.deepEqual(events.map(e=>e.kind),portable?['portable']:['models','npm']);for(const e of events){assert.equal(resolve(e.cwd),f.root);assert.equal(resolve(e.root),f.root);assert.equal(e.node,'node.exe');}if(!portable)assert.deepEqual(events[1].args,['run','dev']);}finally{rmSync(f.base,{recursive:true,force:true});}
+  const f=fixture(portable);try{assert.equal(f.result.status,0,f.result.stdout+f.result.stderr);const events=f.events();assert.deepEqual(events.map(e=>e.kind),portable?['portable']:['npm']);for(const e of events){assert.equal(resolve(e.cwd),f.root);assert.equal(resolve(e.root),f.root);assert.equal(e.node,'node.exe');}if(!portable)assert.deepEqual(events[0].args,['start']);}finally{rmSync(f.base,{recursive:true,force:true});}
 });
-test('BAT stops before building when model setup fails and retains the exit code',{skip:process.platform!=='win32'},()=>{
-  const f=fixture(false,true);try{assert.equal(f.result.status,9,f.result.stdout+f.result.stderr);assert.deepEqual(f.events().map(e=>e.kind),['models']);}finally{rmSync(f.base,{recursive:true,force:true});}
+test('BAT starts offline without fetching evaluation models',{skip:process.platform!=='win32'},()=>{
+  const f=fixture(false,true);try{assert.equal(f.result.status,0,f.result.stdout+f.result.stderr);assert.deepEqual(f.events().map(e=>e.kind),['npm']);}finally{rmSync(f.base,{recursive:true,force:true});}
 });

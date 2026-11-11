@@ -8,28 +8,40 @@ import {StreamCues,validateCue,type Catalog,type Cue} from '../desktop/cues.ts';
 import {readModelLocations,setModelLocation} from '../plugin/model-locations.ts';
 import {constrainPet,petSize,zoomPet,restorePet,recoverPet} from '../desktop/pet-geometry.ts';
 import {renderIndex} from '../desktop/render-index.ts';
+import {portraitIcon} from '../desktop/portrait-icon.ts';
 
+const startedAt=Date.now();
 const test=process.argv.includes('--peko-test');
-const root=process.env.PEKO_ROOT||(app.isPackaged?join(process.resourcesPath,'runtime'):resolve(__dirname,'../..'));
+const root=resolve(process.env.PEKO_ROOT||(app.isPackaged?join(process.resourcesPath,'runtime'):resolve(__dirname,'../..')));
 const built=app.isPackaged?join(app.getAppPath(),'build'):join(root,'build');
 const home=process.env.DSH_HOME||join(homedir(),'.dsh');
 if(process.env.PEKO_USER_DATA)app.setPath('userData',process.env.PEKO_USER_DATA);
 app.setName('PekoPet');
+if(process.platform==='win32')app.setAppUserModelId('com.entropy622.pekopet');
 protocol.registerSchemesAsPrivileged([{scheme:'peko-app',privileges:{standard:true,secure:true,supportFetchAPI:true,corsEnabled:true,stream:true}}]);
-const state:any={status:'正在启动助手',connected:false,home,runtime:'PekoPet',settings:{},catalog:{name:'',expressions:[],layers:[],motions:[],parameters:[]},avatarState:{layers:{}},sessionId:'',busy:false,error:'',avatarError:'',latencies:[],modelPaths:{},modelFile:'',semanticApplied:0,lastAvatarEvent:null};
+const state:any={status:'正在启动助手',connected:false,home,runtime:'PekoPet',settings:{},catalog:{name:'',expressions:[],layers:[],motions:[],parameters:[]},avatarState:{layers:{}},sessionId:'',busy:false,error:'',avatarError:'',latencies:[],modelPaths:{},modelFile:'',semanticApplied:0,lastAvatarEvent:null,iconAvatar:'',startup:{}};
 let chat:BrowserWindow,pet:BrowserWindow,runtime:Runtime,tray:Tray|undefined,quitting=false,stopping:Promise<void>|undefined;
 let activeAvatar='',petReady=false,generation=0,firstTokenAt=0,semantic=false;
+let refreshPortrait=false;
 let gazeTimer:ReturnType<typeof setInterval>|undefined;
 const onDisplayChange=()=>{if(!quitting)applyWindowSettings();};
 const streams=new StreamCues();
 let petHit=false,petDragging=false,petIgnoring:boolean|undefined;
+let pendingGeometry:Record<string,unknown>|undefined;
+function startupStage(name:string){if(state.startup[name]!==undefined)return;state.startup[name]=Date.now()-startedAt;console.info('[PekoPet startup]',name,state.startup[name]+' ms');}
 const geometryKeys=['petX','petY','petWidth','petHeight','petScale','petMonitor','petDpi'] as const;
 function geometryPatch(){return Object.fromEntries(geometryKeys.filter(key=>state.settings[key]!==undefined).map(key=>[key,state.settings[key]]));}
 const send=(name:string,payload:unknown)=>{for(const window of [chat,pet])if(window&&!window.isDestroyed())window.webContents.send(name,payload);};
 function publish(){send('peko-state',state);}
 function fail(error:unknown){state.error=String(error instanceof Error?error.message:error);publish();}
-function iconPath(){return join(home,'peko-pet/icons',activeAvatar+'-head.png');}
-function refreshIcon(){const file=iconPath();if(!existsSync(file))return;const icon=nativeImage.createFromPath(file);chat.setIcon(icon);tray?.setImage(icon.resize({width:24,height:24}));send('peko-portrait',{});}
+function iconPath(){return join(home,'peko-pet/icons',(state.settings.avatar||activeAvatar||'deepseek')+'-head.png');}
+function refreshIcon(regenerate=false){
+  const file=iconPath();if(!existsSync(file))return;const icon=nativeImage.createFromPath(file);if(icon.isEmpty())return;
+  const ico=file.replace(/\.png$/,'.ico');if(regenerate||!existsSync(ico))writeFileSync(ico,portraitIcon(icon.resize({width:256,height:256,quality:'best'}).toPNG()));
+  chat.setIcon(icon);tray?.setImage(icon.resize({width:24,height:24}));
+  if(process.platform==='win32')chat.setAppDetails({appId:'com.entropy622.pekopet',appIconPath:ico,appIconIndex:0,relaunchCommand:'"'+app.getPath('exe')+'"'+(app.isPackaged?'':' "'+root+'"'),relaunchDisplayName:'PekoPet'});
+  state.iconAvatar=state.settings.avatar||activeAvatar||'deepseek';startupStage('iconMs');send('peko-portrait',{});
+}
 function notify(body:string){if(!test&&!state.settings.dnd&&Notification.isSupported()){const notification=new Notification({title:'PekoPet',body,icon:existsSync(iconPath())?iconPath():undefined});notification.on('click',()=>showChat());notification.show();}}
 function showChat(){if(quitting||!chat||chat.isDestroyed())return;if(!test){chat.show();chat.focus();}}
 function applyCue(value:Cue,source='debug'){
@@ -64,13 +76,20 @@ async function startRuntime(){
     const result=await dialog.showOpenDialog(chat,{properties:['openDirectory'],title:'选择项目目录'});return result.canceled?null:result.filePaths[0];
   });
   runtime.on('event',(method,p)=>{if(current===generation)onRuntimeEvent(method,p);});
+  runtime.on('bootstrap',settings=>{
+    if(quitting||current!==generation)return;
+    state.settings={...settings,...pendingGeometry};state.modelPaths=readModelLocations(home);startupStage('preferencesMs');refreshIcon();applyWindowSettings();
+    void loadPet(state.settings.avatar||'deepseek').catch(error=>{state.avatarError=String(error.message||error);publish();});
+  });
   runtime.on('stopped',(error)=>{if(current===generation&&!quitting&&!runtime.closing){state.connected=false;state.busy=false;state.status='助手已停止';send('avatar-state',{cancel:true});fail(error);}});
-  await runtime.ready;if(quitting)return;state.settings=await runtime.call('peko.settings');if(quitting)return;state.connected=true;state.error='';state.status='在你身边';publish();
-  if(petReady)await runtime.call('peko.avatar',{sessionId:state.sessionId||'peko-catalog',catalog:state.catalog,state:state.avatarState});if(quitting)return;state.modelPaths=readModelLocations(home);applyWindowSettings();await chat.loadURL('peko-app://app/');if(quitting)return;void loadPet(state.settings.avatar||'deepseek').catch(error=>{state.avatarError=String(error.message||error);publish();});
+  await runtime.ready;if(quitting)return;state.settings={...await runtime.call('peko.settings'),...pendingGeometry};if(quitting)return;state.connected=true;startupStage('agentMs');state.error='';state.status='在你身边';publish();
+  if(pendingGeometry){const patch=pendingGeometry;pendingGeometry=undefined;void runtime.call('peko.settings',{patch}).catch(fail);}
+  if(petReady)await runtime.call('peko.avatar',{sessionId:state.sessionId||'peko-catalog',catalog:state.catalog,state:state.avatarState});if(quitting)return;applyWindowSettings();await chat.loadURL('peko-app://app/');if(quitting)return;startupStage('chatMs');publish();
 }
 async function loadPet(id:string,force=false){
   if(activeAvatar===id&&petReady&&!force)return;
   state.modelFile=modelFile(root,home,id);if(activeAvatar&&activeAvatar!==id){state.avatarState={layers:{}};if(state.sessionId)await runtime.call('peko.avatar',{sessionId:state.sessionId,catalog:state.catalog,state:state.avatarState});}activeAvatar=id;petReady=false;
+  refreshPortrait=force;
   await pet.loadURL('peko-app://pet/?avatar='+encodeURIComponent(id));refreshIcon();
 }
 function updatePetHit(){
@@ -85,7 +104,7 @@ function placePet(value:{x:number;y:number;width:number;height:number;scale:numb
   if(actual.x!==clamped.x||actual.y!==clamped.y){pet.setPosition(clamped.x,clamped.y);actual=pet.getBounds();}
   const patch={petX:actual.x,petY:actual.y,petWidth:actual.width,petHeight:actual.height,petScale:value.scale,petMonitor:String(display.id),petDpi:Math.round(display.scaleFactor*96)};
   state.settings={...state.settings,...patch};updatePetHit();send('avatar-settings',{scale:value.scale});publish();
-  if(persist)void runtime.call('peko.settings',{patch}).catch(fail);
+  if(persist){if(state.connected)void runtime.call('peko.settings',{patch}).catch(fail);else pendingGeometry=patch;}
 }
 function resizePet(scale:number,anchor={x:.5,y:1}){
   const bounds=pet.getBounds(),display=screen.getDisplayMatching(bounds);placePet(zoomPet(bounds,scale,display.bounds,anchor));
@@ -114,9 +133,9 @@ ipcMain.handle('peko:host',(event,method:string,p:any)=>{if(quitting)return;allo
 ipcMain.handle('peko:invoke',async(event,command:string,args:any={})=>{
   if(quitting)return;
   const isPet=event.sender===pet?.webContents;allowSender(event,isPet?'pet':'app');
-  if(command==='avatar_descriptor'&&isPet)return {...modelDescriptor(root,home,activeAvatar),test};
-  if(command==='avatar_ready'&&isPet){if(args.id!==activeAvatar)return;state.catalog=args.catalog;state.avatarError='';petReady=true;await runtime.call('peko.avatar',{sessionId:state.sessionId||'peko-catalog',catalog:state.catalog});send('avatar-settings',{scale:state.settings.petScale||1});send('avatar-state',{layers:state.avatarState.layers});publish();return;}
-  if(command==='avatar_portrait'&&isPet){if(args.id!==activeAvatar)return;const data=Buffer.from(args.png.split(',')[1],'base64');if(data.length>4*1024*1024)throw new Error('头像过大');mkdirSync(dirname(iconPath()),{recursive:true});writeFileSync(iconPath(),data);writeFileSync(iconPath().replace(/\.png$/,'.json'),JSON.stringify({avatar:activeAvatar,author:modelDescriptor(root,home,activeAvatar).avatar.author,source:'Local Cubism Web portrait'}));refreshIcon();return;}
+  if(command==='avatar_descriptor'&&isPet)return {...modelDescriptor(root,home,activeAvatar),portraitCached:!refreshPortrait&&state.iconAvatar===activeAvatar,test};
+  if(command==='avatar_ready'&&isPet){if(args.id!==activeAvatar)return;state.catalog=args.catalog;state.avatarError='';petReady=true;startupStage('petMs');if(state.connected)void runtime.call('peko.avatar',{sessionId:state.sessionId||'peko-catalog',catalog:state.catalog,state:state.avatarState}).catch(fail);send('avatar-settings',{scale:state.settings.petScale||1});send('avatar-state',{layers:state.avatarState.layers});publish();return;}
+  if(command==='avatar_portrait'&&isPet){if(args.id!==activeAvatar)return;const data=Buffer.from(args.png.split(',')[1],'base64');if(data.length>4*1024*1024)throw new Error('头像过大');mkdirSync(dirname(iconPath()),{recursive:true});writeFileSync(iconPath(),data);writeFileSync(iconPath().replace(/\.png$/,'.json'),JSON.stringify({avatar:activeAvatar,author:JSON.parse(readFileSync(join(root,'assets/avatars.json'),'utf8')).avatars[activeAvatar].author,source:'Local Cubism Web portrait'}));refreshIcon(true);publish();return;}
   if(command==='avatar_applied'&&isPet){state.lastAvatarEvent={source:args.source,cue:args.cue};if(args.source==='assistant')state.semanticApplied++;state.latencies.push(Math.max(0,Date.now()-args.sentAt));state.latencies=state.latencies.slice(-200);publish();return;}
   if(command==='avatar_error'&&isPet){if(args.recovering)petReady=false;state.avatarError=args.message;publish();return;}
   if(command==='pet_click'&&isPet){showChat();return;}
@@ -206,6 +225,7 @@ if(!app.requestSingleInstanceLock())app.quit();else{
     gazeTimer=setInterval(()=>{if(!quitting&&petReady&&!pet.isDestroyed()&&!pet.webContents.isDestroyed()&&(!test||process.env.PEKO_TEST_GAZE)){const point=screen.getCursorScreenPoint(),bounds=pet.getBounds();pet.webContents.send('avatar-gaze',{x:Math.max(-1,Math.min(1,(point.x-bounds.x-bounds.width/2)/(bounds.width/2))),y:Math.max(-1,Math.min(1,-(point.y-bounds.y-bounds.height/2)/(bounds.height/2))),visible:pet.isVisible()||test,clientX:point.x-bounds.x,clientY:point.y-bounds.y,inside:point.x>=bounds.x&&point.x<bounds.x+bounds.width&&point.y>=bounds.y&&point.y<bounds.y+bounds.height});}},33);gazeTimer.unref();
     await pet.loadURL('about:blank');
     await chat.loadURL('peko-app://app/starting.html');
+    startupStage('shellMs');
     await startRuntime();
   }).catch(async error=>{if(quitting)return;fail(error);console.error(error);if(chat&&!chat.isDestroyed()){await chat.loadURL('peko-app://app/starting.html');publish();}});
 }

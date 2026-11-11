@@ -18,5 +18,7 @@ export function modelDescriptor(root:string,home:string,id:string){
   const file=modelFile(root,home,id),base=dirname(file),avatar=metadata.avatars[id],expressions:Record<string,string>={},motions:Record<string,string>={};
   function walk(directory:string){for(const entry of readdirSync(directory,{withFileTypes:true})){const path=join(directory,entry.name);if(entry.isDirectory())walk(path);else if(entry.name.endsWith('.exp3.json')){const name=entry.name.slice(0,-10);if(!avatar.excluded.includes(name))expressions[name]=relative(base,path).replaceAll('\\','/');}else if(entry.name.endsWith('.motion3.json'))motions[entry.name.slice(0,-13)]=relative(base,path).replaceAll('\\','/');}}
   walk(base);
-  return {id,avatar,metadata,settings:JSON.parse(readFileSync(file,'utf8')),expressions,motions,baseUrl:'peko-app://pet/model/'+encodeURIComponent(id)+'/'};
+  const settings=JSON.parse(readFileSync(file,'utf8')),refs=settings.FileReferences||{},jsonAssets:Record<string,string>={};
+  for(const name of new Set([refs.Physics,refs.Pose,...Object.values(expressions),...Object.values(motions)].filter((name):name is string=>typeof name==='string'&&!!name)))jsonAssets[name]=readFileSync(confinedFile(base,name),'utf8');
+  return {id,avatar,metadata,settings,expressions,motions,jsonAssets,baseUrl:'peko-app://pet/model/'+encodeURIComponent(id)+'/'};
 }

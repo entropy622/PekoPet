@@ -6,9 +6,7 @@ set "PEKO_NODE=node.exe"
 if exist "PekoPet.exe" (
   call PekoPet.cmd
 ) else (
-  node.exe scripts/fetch-models.mjs
-  if errorlevel 1 goto failed
-  call npm.cmd run dev
+  call npm.cmd start
 )
 if errorlevel 1 goto failed
 popd

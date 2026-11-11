@@ -46,6 +46,7 @@ try {
         await pet.waitForFunction(() => window.__pekoAvatarTest, null, { timeout: 90000 });
         await pet.evaluate(() => { window.__exitGaze = 0; window.peko.listen('avatar-gaze', () => window.__exitGaze++); });
         await pet.waitForFunction(() => window.__exitGaze >= 3);
+        await app.windows().find(p=>p.url().startsWith('peko-app://app/')).waitForSelector('[data-peko-ready]',{timeout:180000});
         console.log('Gaze active: '+scenario);
         const before = Date.now(), child = app.process();
         let exitTimer;

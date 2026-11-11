@@ -17,36 +17,37 @@ class Avatar extends CubismUserModel {
   settings:any;descriptor:any;gl:WebGLRenderingContext;canvas:HTMLCanvasElement;
   catalog:any;bufferResizes=0;draws=0;
   async initialize(descriptor:any,canvas:HTMLCanvasElement){
+    const load:Record<string,number>={};let phase=performance.now();const mark=(name:string)=>{const now=performance.now();load[name]=Math.round(now-phase);phase=now;};
     this.descriptor=descriptor;this.canvas=canvas;
-    const gl=canvas.getContext('webgl',{alpha:true,premultipliedAlpha:true,preserveDrawingBuffer:true,antialias:true});if(!gl)throw new Error('当前设备无法初始化 WebGL');this.gl=gl;
+    const gl=canvas.getContext('webgl',{alpha:true,premultipliedAlpha:true,preserveDrawingBuffer:true,antialias:true});if(!gl)throw new Error('当前设备无法初始化 WebGL');this.gl=gl;mark('contextMs');
     const buffer=new TextEncoder().encode(JSON.stringify(descriptor.settings)).buffer;
     const settings=new CubismModelSettingJson(buffer,buffer.byteLength);this.settings=settings;
-    const bytes=async(file:string)=>{const response=await fetch(descriptor.baseUrl+file.split('/').map(encodeURIComponent).join('/'));if(!response.ok)throw new Error('无法读取角色资源：'+file);return response.arrayBuffer();};
-    const moc=await bytes(settings.getModelFileName());this.loadModel(moc,true);
+    const bytes=async(file:string)=>{if(Object.hasOwn(descriptor.jsonAssets,file))return new TextEncoder().encode(descriptor.jsonAssets[file]).buffer;const response=await fetch(descriptor.baseUrl+file.split('/').map(encodeURIComponent).join('/'));if(!response.ok)throw new Error('无法读取角色资源：'+file);return response.arrayBuffer();};
+    const [moc,images]=await Promise.all([bytes(settings.getModelFileName()),Promise.all(Array.from({length:settings.getTextureCount()},async(_,i)=>{const image=new Image();image.src=descriptor.baseUrl+settings.getTextureFileName(i).split('/').map(encodeURIComponent).join('/');await image.decode();return image;}))]);mark('resourcesMs');this.loadModel(moc,true);
     if(settings.getPhysicsFileName()){const data=await bytes(settings.getPhysicsFileName());this.loadPhysics(data,data.byteLength);}
     if(settings.getPoseFileName()){const data=await bytes(settings.getPoseFileName());this.loadPose(data,data.byteLength);}
     this._eyeBlink=CubismEyeBlink.create(settings);this._breath=CubismBreath.create();
     this._breath.setParameters([new BreathParameterData(CubismFramework.getIdManager().getId('ParamBreath'),.5,.5,3.2,1)]);
     const layout=new Map<string,number>();settings.getLayoutMap(layout);this._modelMatrix.setupFromLayout(layout);
     this._physics?.stabilization(this._model);this._model.saveParameters();
-    const groups=new Set(this._model.getDrawableMasks().filter(mask=>mask.length).map(mask=>[...mask].sort((a,b)=>a-b).join(',')));
+    mark('modelMs');const groups=new Set(this._model.getDrawableMasks().filter(mask=>mask.length).map(mask=>[...mask].sort((a,b)=>a-b).join(',')));
     const buffers=groups.size<=36?1:Math.ceil(groups.size/32);
     this.createRenderer(canvas.width,canvas.height,buffers);const renderer=this.getRenderer();renderer.setClippingMaskBufferSize(2048);renderer.startUp(gl);renderer.setIsPremultipliedAlpha(true);
     renderer.loadShaders('peko-app://pet/shaders/');
-    await new Promise<void>((resolve,reject)=>{const shader=CubismShaderManager_WebGL.getInstance().getShader(gl);const check=()=>shader._isShaderLoaded?resolve():!shader._isShaderLoading?reject(new Error('Live2D 着色器加载失败')):requestAnimationFrame(check);check();});
+    await new Promise<void>((resolve,reject)=>{const shader=CubismShaderManager_WebGL.getInstance().getShader(gl);const check=()=>shader._isShaderLoaded?resolve():!shader._isShaderLoading?reject(new Error('Live2D 着色器加载失败')):requestAnimationFrame(check);check();});mark('shadersMs');
     for(let i=0;i<settings.getTextureCount();i++){
-      const image=new Image();image.src=descriptor.baseUrl+settings.getTextureFileName(i).split('/').map(encodeURIComponent).join('/');await image.decode();
+      const image=images[i];
       const texture=gl.createTexture();if(!texture)throw new Error('纹理分配失败');gl.bindTexture(gl.TEXTURE_2D,texture);gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,1);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,image);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);renderer.bindTexture(i,texture);
     }
-    for(const [name,file]of Object.entries(descriptor.expressions)){const data=JSON.parse(new TextDecoder().decode(await bytes(file as string)));this.expressions.set(name,{parameters:data.Parameters||[],weight:0,target:0});}
+    mark('texturesMs');for(const [name,file]of Object.entries(descriptor.expressions)){const data=JSON.parse(new TextDecoder().decode(await bytes(file as string)));this.expressions.set(name,{parameters:data.Parameters||[],weight:0,target:0});}
     const eyeIds=Array.from({length:settings.getEyeBlinkParameterCount()},(_,i)=>settings.getEyeBlinkParameterId(i)),lipIds=Array.from({length:settings.getLipSyncParameterCount()},(_,i)=>settings.getLipSyncParameterId(i));
     for(const [name,file]of Object.entries(descriptor.motions)){const data=await bytes(file as string),motion=this.loadMotion(data,data.byteLength,name);if(!motion)throw new Error('无法加载动作：'+name);motion.setEffectIds(eyeIds,lipIds);this.motions.set(name,motion);}
-    const parameters=[];
+    mark('animationsMs');const parameters=[];
     for(let i=0;i<this._model.getParameterCount();i++){const id=this._model.getParameterId(i).getString();if(!descriptor.avatar.excludedParameters?.includes(id)&&(descriptor.metadata.parameters.includes(id)||descriptor.avatar.parameters?.includes(id)))parameters.push({id,min:this._model.getParameterMinimumValue(i),max:this._model.getParameterMaximumValue(i),default:this._model.getParameterDefaultValue(i)});}
     const layers=Object.keys(descriptor.expressions).filter(name=>descriptor.avatar.layers.includes(name));
     this.catalog={name:descriptor.avatar.name,expressions:Object.keys(descriptor.expressions).filter(name=>!layers.includes(name)),layers,motions:Object.keys(descriptor.motions),parameters};
-    this.resize();for(let i=0;i<60;i++)this.update(1/60);this.draw();
-    return {parameters:this._model.getParameterCount(),drawables:this._model.getDrawableCount(),clippingGroups:groups.size,maskBuffers:buffers};
+    this.resize();for(let i=0;i<60;i++)this.update(1/60);this.draw();mark('poseMs');
+    return {load,parameters:this._model.getParameterCount(),drawables:this._model.getDrawableCount(),clippingGroups:groups.size,maskBuffers:buffers};
   }
   inspect(){const parameters:Record<string,number>={};for(let i=0;i<this._model.getParameterCount();i++)parameters[this._model.getParameterId(i).getString()]=this._model.getParameterValueByIndex(i);return {parameters,clock:this.clock,mix:this.mix,layers:[...this.layers],visible:this.visible,scale:this.scale,weights:Object.fromEntries([...this.expressions].map(([name,value])=>[name,value.weight])),motionFinished:this._motionManager.isFinished(),contextLost:this.gl.isContextLost(),bufferResizes:this.bufferResizes,draws:this.draws,maskSize:this.getRenderer().getClippingMaskBufferSize(),highPrecisionMask:this.getRenderer().isUsingHighPrecisionMask()};}
   step(seconds:number){for(let i=0;i<Math.ceil(seconds*60);i++)this.update(1/60);this.draw();const pixels=new Uint8Array(this.canvas.width*this.canvas.height*4);this.gl.readPixels(0,0,this.canvas.width,this.canvas.height,this.gl.RGBA,this.gl.UNSIGNED_BYTE,pixels);let visible=0;for(let i=3;i<pixels.length;i+=4)if(pixels[i]>20)visible++;return {...this.inspect(),visiblePixels:visible};}
@@ -86,8 +87,8 @@ class Avatar extends CubismUserModel {
 
 async function start(){
   const option=new Option();option.logFunction=message=>console.info('[Cubism]',message);CubismFramework.startUp(option);CubismFramework.initialize();
-  const descriptor=await window.peko.invoke('avatar_descriptor');const avatar=new Avatar(),canvas=document.querySelector<HTMLCanvasElement>('#pet')!;
-  const stats=await avatar.initialize(descriptor,canvas);
+  const requested=performance.now(),descriptor=await window.peko.invoke('avatar_descriptor'),descriptorMs=performance.now()-requested;const avatar=new Avatar(),canvas=document.querySelector<HTMLCanvasElement>('#pet')!;
+  const stats=await avatar.initialize(descriptor,canvas);stats.load.descriptorMs=Math.round(descriptorMs);
   const failure=(error:unknown)=>{avatar.cancel();void window.peko.invoke('avatar_error',{message:'角色渲染失败：'+String(error instanceof Error?error.message:error)});};
   await window.peko.listen('avatar-cue',({payload})=>{try{avatar.cue(payload.cue);avatar.update(1/60);avatar.draw();void window.peko.invoke('avatar_applied',{sentAt:payload.sentAt,source:payload.source,cue:payload.cue});}catch(error){failure(error);}});
   canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();void window.peko.invoke('avatar_error',{message:'显卡上下文已丢失，正在恢复角色',recovering:true});});
@@ -97,7 +98,7 @@ async function start(){
   let hover:{x:number;y:number}|null=null,lastHit:boolean|undefined;
   await window.peko.listen('avatar-gaze',({payload})=>{if(Math.abs(payload.x-avatar.gaze.x)+Math.abs(payload.y-avatar.gaze.y)>.02)avatar.activeUntil=performance.now()+250;avatar.gaze=payload;avatar.visible=payload.visible;if(payload.inside!==undefined)hover=payload.inside?{x:payload.clientX,y:payload.clientY}:null;});
   await window.peko.invoke('avatar_ready',{id:descriptor.id,catalog:avatar.catalog});
-  await window.peko.invoke('avatar_portrait',{id:descriptor.id,png:avatar.portrait()});
+  if(!descriptor.portraitCached)await window.peko.invoke('avatar_portrait',{id:descriptor.id,png:avatar.portrait()});
   let pointer:{x:number;y:number}|null=null,moved=false;
   const endDrag=()=>{pointer=null;void window.peko.invoke('pet_drag',{active:false});};
   canvas.addEventListener('pointerdown',event=>{if(event.button!==0)return;pointer={x:event.screenX,y:event.screenY};moved=false;canvas.setPointerCapture(event.pointerId);void window.peko.invoke('pet_drag',{active:true});});
