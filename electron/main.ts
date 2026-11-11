@@ -6,6 +6,7 @@ import {Runtime} from '../desktop/runtime.ts';
 import {modelDescriptor,modelFile,confinedFile} from '../desktop/model-library.ts';
 import {StreamCues,validateCue,type Catalog,type Cue} from '../desktop/cues.ts';
 import {readModelLocations,setModelLocation} from '../plugin/model-locations.ts';
+import {constrainPet,petSize,zoomPet,restorePet,recoverPet} from '../desktop/pet-geometry.ts';
 import {renderIndex} from '../desktop/render-index.ts';
 
 const test=process.argv.includes('--peko-test');
@@ -19,6 +20,9 @@ const state:any={status:'正在启动助手',connected:false,home,runtime:'PekoP
 let chat:BrowserWindow,pet:BrowserWindow,runtime:Runtime,tray:Tray|undefined,quitting=false,stopping:Promise<void>|undefined;
 let activeAvatar='',petReady=false,generation=0,firstTokenAt=0,semantic=false;
 const streams=new StreamCues();
+let petHit=false,petDragging=false,petIgnoring:boolean|undefined;
+const geometryKeys=['petX','petY','petWidth','petHeight','petScale','petMonitor','petDpi'] as const;
+function geometryPatch(){return Object.fromEntries(geometryKeys.filter(key=>state.settings[key]!==undefined).map(key=>[key,state.settings[key]]));}
 const send=(name:string,payload:unknown)=>{for(const window of [chat,pet])if(window&&!window.isDestroyed())window.webContents.send(name,payload);};
 function publish(){send('peko-state',state);}
 function fail(error:unknown){state.error=String(error instanceof Error?error.message:error);publish();}
@@ -65,9 +69,37 @@ async function loadPet(id:string,force=false){
   state.modelFile=modelFile(root,home,id);if(activeAvatar&&activeAvatar!==id){state.avatarState={layers:{}};if(state.sessionId)await runtime.call('peko.avatar',{sessionId:state.sessionId,catalog:state.catalog,state:state.avatarState});}activeAvatar=id;petReady=false;
   await pet.loadURL('peko-app://pet/?avatar='+encodeURIComponent(id));refreshIcon();
 }
-function visibleBounds(bounds:any){const display=screen.getDisplayMatching(bounds),area=display.workArea;return {...bounds,x:Math.max(area.x,Math.min(bounds.x,area.x+area.width-bounds.width)),y:Math.max(area.y,Math.min(bounds.y,area.y+area.height-bounds.height))};}
-function refreshTray(){if(tray)tray.setContextMenu(Menu.buildFromTemplate([{label:'打开聊天',click:showChat},{label:'显示／隐藏桌宠',click:()=>pet.isVisible()?pet.hide():pet.showInactive()},{label:'鼠标穿透',type:'checkbox',checked:!!state.settings.clickThrough,click:item=>{void runtime.call('peko.settings',{patch:{clickThrough:item.checked}}).then(value=>{state.settings=value;applyWindowSettings();publish();}).catch(fail);}},{label:'置顶',type:'checkbox',checked:!!state.settings.topmost,click:item=>{void runtime.call('peko.settings',{patch:{topmost:item.checked}}).then(value=>{state.settings=value;applyWindowSettings();publish();}).catch(fail);}},{type:'separator'},{label:'退出 PekoPet',click:()=>void quit()}]));}
-function applyWindowSettings(){refreshTray();if(!pet||pet.isDestroyed())return;pet.setAlwaysOnTop(!!state.settings.topmost,'floating');pet.setIgnoreMouseEvents(!!state.settings.clickThrough,{forward:true});const old=pet.getBounds();pet.setBounds(visibleBounds({...old,x:Math.round(state.settings.petX??old.x),y:Math.round(state.settings.petY??old.y),width:Math.round(state.settings.petWidth||400),height:Math.round(state.settings.petHeight||600)}));if(!test)pet.showInactive();send('avatar-settings',{scale:state.settings.petScale||1});}
+function updatePetHit(){
+  const ignoring=!!state.settings.clickThrough||(!petDragging&&!petHit);
+  if(ignoring!==petIgnoring){pet.setIgnoreMouseEvents(ignoring,{forward:true});petIgnoring=ignoring;}
+  state.petWindow={...pet.getBounds(),scale:state.settings.petScale||1,ignoringMouse:ignoring,dragging:petDragging};
+}
+function placePet(value:{x:number;y:number;width:number;height:number;scale:number},persist=true){
+  const bounds={x:value.x,y:value.y,width:value.width,height:value.height},old=pet.getBounds();
+  if(old.width===bounds.width&&old.height===bounds.height)pet.setPosition(bounds.x,bounds.y);else pet.setBounds(bounds);
+  let actual=pet.getBounds();const display=screen.getDisplayMatching(actual),clamped=constrainPet(actual,display.bounds);
+  if(actual.x!==clamped.x||actual.y!==clamped.y){pet.setPosition(clamped.x,clamped.y);actual=pet.getBounds();}
+  const patch={petX:actual.x,petY:actual.y,petWidth:actual.width,petHeight:actual.height,petScale:value.scale,petMonitor:String(display.id),petDpi:Math.round(display.scaleFactor*96)};
+  state.settings={...state.settings,...patch};updatePetHit();send('avatar-settings',{scale:value.scale});publish();
+  if(persist)void runtime.call('peko.settings',{patch}).catch(fail);
+}
+function resizePet(scale:number,anchor={x:.5,y:1}){
+  const bounds=pet.getBounds(),display=screen.getDisplayMatching(bounds);placePet(zoomPet(bounds,scale,display.bounds,anchor));
+}
+function petAction(action:string){
+  if(action==='zoom-in')resizePet((state.settings.petScale||1)*1.2);
+  else if(action==='zoom-out')resizePet((state.settings.petScale||1)/1.2);
+  else if(action==='reset-size')resizePet(1);
+  else if(action==='recover'){const bounds=pet.getBounds(),display=screen.getDisplayMatching(bounds);placePet(recoverPet(bounds,state.settings.petScale||1,display.workArea));}
+  else throw new Error('未知桌宠操作');
+}
+function petMenu(){return Menu.buildFromTemplate([{label:'打开聊天',click:showChat},{type:'separator'},{label:'放大',click:()=>petAction('zoom-in')},{label:'缩小',click:()=>petAction('zoom-out')},{label:'恢复默认大小',click:()=>petAction('reset-size')},{label:'移回屏幕内',click:()=>petAction('recover')}]);}
+function refreshTray(){if(tray)tray.setContextMenu(Menu.buildFromTemplate([{label:'打开聊天',click:showChat},{label:'显示／隐藏桌宠',click:()=>pet.isVisible()?pet.hide():pet.showInactive()},{label:'移回屏幕内',click:()=>petAction('recover')},{label:'鼠标穿透',type:'checkbox',checked:!!state.settings.clickThrough,click:item=>{void runtime.call('peko.settings',{patch:{clickThrough:item.checked}}).then(value=>{state.settings={...value,...geometryPatch()};applyWindowSettings();publish();}).catch(fail);}},{label:'置顶',type:'checkbox',checked:!!state.settings.topmost,click:item=>{void runtime.call('peko.settings',{patch:{topmost:item.checked}}).then(value=>{state.settings={...value,...geometryPatch()};applyWindowSettings();publish();}).catch(fail);}},{type:'separator'},{label:'退出 PekoPet',click:()=>void quit()}]));}
+function applyWindowSettings(){
+  refreshTray();if(!pet||pet.isDestroyed())return;pet.setAlwaysOnTop(!!state.settings.topmost,'floating');
+  const requested={...pet.getBounds(),x:Math.round(state.settings.petX??pet.getBounds().x),y:Math.round(state.settings.petY??pet.getBounds().y),width:state.settings.petWidth||pet.getBounds().width,height:state.settings.petHeight||pet.getBounds().height},display=screen.getDisplayMatching(requested);
+  placePet(restorePet(state.settings,display.bounds),false);if(!test)pet.showInactive();
+}
 function allowSender(event:Electron.IpcMainInvokeEvent,host:'app'|'pet'){
   const window=host==='app'?chat:pet;if(!window||window.isDestroyed()||event.sender.isDestroyed()||event.sender!==window.webContents||event.senderFrame!==event.sender.mainFrame)throw new Error('拒绝非主框架 IPC');
   const url=new URL(event.senderFrame!.url);if(url.protocol!=='peko-app:'||url.hostname!==host)throw new Error('拒绝外部页面 IPC');
@@ -82,8 +114,20 @@ ipcMain.handle('peko:invoke',async(event,command:string,args:any={})=>{
   if(command==='avatar_applied'&&isPet){state.lastAvatarEvent={source:args.source,cue:args.cue};if(args.source==='assistant')state.semanticApplied++;state.latencies.push(Math.max(0,Date.now()-args.sentAt));state.latencies=state.latencies.slice(-200);publish();return;}
   if(command==='avatar_error'&&isPet){if(args.recovering)petReady=false;state.avatarError=args.message;publish();return;}
   if(command==='pet_click'&&isPet){showChat();return;}
-  if(command==='pet_move'&&isPet){const position=pet.getPosition(),bounds=visibleBounds({...pet.getBounds(),x:position[0]+Math.round(args.x),y:position[1]+Math.round(args.y)});pet.setBounds(bounds);state.settings={...state.settings,petX:bounds.x,petY:bounds.y};await runtime.call('peko.settings',{patch:{petX:bounds.x,petY:bounds.y}});return;}
-  if(command==='pet_scale'&&isPet){const scale=Math.max(.1,Math.min(4,(state.settings.petScale||1)*Math.exp(-args.delta*.001)));state.settings=await runtime.call('peko.settings',{patch:{petScale:scale}});send('avatar-settings',{scale});publish();return;}
+  if(command==='pet_hit'&&isPet){petHit=!!args.hit;updatePetHit();return;}
+  if(command==='pet_drag'&&isPet){petDragging=!!args.active;updatePetHit();return;}
+  if(command==='pet_context_menu'&&isPet){if(!test)petMenu().popup({window:pet});return ['放大','缩小','恢复默认大小','移回屏幕内'];}
+  if(command==='pet_action'&&isPet){petAction(args.action);return;}
+  if(command==='pet_move'&&isPet){
+    if(!Number.isFinite(args.x)||!Number.isFinite(args.y))throw new Error('移动距离须为有效数值');
+    const old=pet.getBounds(),requested={...old,x:old.x+args.x,y:old.y+args.y},display=screen.getDisplayMatching(requested),size=petSize(state.settings.petScale||1,display.bounds);
+    const dimensions=size.scale===(state.settings.petScale||1)?{width:old.width,height:old.height}:size;
+    placePet({...constrainPet({...requested,...dimensions},display.bounds),scale:size.scale});return;
+  }
+  if(command==='pet_scale'&&isPet){
+    if(!Number.isFinite(args.delta))throw new Error('缩放距离须为有效数值');
+    const anchor={x:Number.isFinite(args.anchorX)?args.anchorX:.5,y:Number.isFinite(args.anchorY)?args.anchorY:1};resizePet((state.settings.petScale||1)*Math.exp(-args.delta*.001),anchor);return;
+  }
   if(isPet)throw new Error('桌宠无权访问此操作');
   if(command==='avatar_pick'){
     const avatars=JSON.parse(readFileSync(join(root,'assets/avatars.json'),'utf8')).avatars;if(!avatars[args.id])throw new Error('未知角色');
@@ -102,7 +146,7 @@ ipcMain.handle('peko:invoke',async(event,command:string,args:any={})=>{
   if(command==='peko_request'){
     if(typeof args.method!=='string'||!args.method.startsWith('peko.'))throw new Error('无效助手请求');
     const result=await runtime.call(args.method,args.params);
-    if(args.method==='peko.settings'&&args.params?.patch){const avatar=state.settings.avatar;state.settings=result;applyWindowSettings();if(avatar!==result.avatar)await loadPet(result.avatar);publish();}return result;
+    if(args.method==='peko.settings'&&args.params?.patch){const avatar=state.settings.avatar;state.settings=geometryKeys.some(key=>Object.hasOwn(args.params.patch,key))?result:{...result,...geometryPatch()};applyWindowSettings();if(avatar!==result.avatar)await loadPet(result.avatar);publish();}return result;
   }
   if(command==='window_action'){if(args.action==='minimize')chat.minimize();else if(args.action==='maximize')chat.isMaximized()?chat.unmaximize():chat.maximize();else if(args.action==='close')chat.close();else if(args.action==='exit')void quit();return;}
   throw new Error('未知操作：'+command);
@@ -144,16 +188,16 @@ if(!app.requestSingleInstanceLock())app.quit();else{
     const preload=join(built,'electron/preload.cjs'),icon=join(root,'assets/icon.ico');
     const options={preload,contextIsolation:true,nodeIntegration:false,sandbox:true,backgroundThrottling:false,offscreen:test};
     chat=new BrowserWindow({width:720,height:760,minWidth:600,minHeight:620,show:!test,frame:false,backgroundColor:'#f1f5f9',icon,webPreferences:options});
-    pet=new BrowserWindow({width:400,height:600,show:false,frame:false,transparent:true,hasShadow:false,resizable:false,skipTaskbar:true,focusable:false,webPreferences:options});
+    pet=new BrowserWindow({width:400,height:600,show:false,frame:false,transparent:true,backgroundColor:'#00000000',thickFrame:false,hasShadow:false,resizable:false,skipTaskbar:true,focusable:false,webPreferences:options});
     for(const window of [chat,pet]){
       window.webContents.setWindowOpenHandler(({url})=>{if(/^https?:/.test(url)){if(test)send('peko-external-link',url);else void shell.openExternal(url);}return {action:'deny'};});
       window.webContents.on('will-navigate',(event,url)=>{const target=new URL(url);if(target.protocol!=='peko-app:'||!['app','pet'].includes(target.hostname))event.preventDefault();});
       window.webContents.session.setPermissionRequestHandler((_contents,_permission,callback)=>callback(false));
     }
     chat.on('close',event=>{if(!quitting){event.preventDefault();chat.hide();}});
-    if(!test){tray=new Tray(icon);tray.setToolTip('PekoPet');tray.on('click',showChat);refreshTray();globalShortcut.register('CommandOrControl+Alt+P',showChat);globalShortcut.register('CommandOrControl+Alt+Shift+P',()=>{void runtime.call('peko.settings',{patch:{clickThrough:!state.settings.clickThrough}}).then(value=>{state.settings=value;applyWindowSettings();publish();}).catch(fail);});}
+    if(!test){tray=new Tray(icon);tray.setToolTip('PekoPet');tray.on('click',showChat);refreshTray();globalShortcut.register('CommandOrControl+Alt+P',showChat);globalShortcut.register('CommandOrControl+Alt+Shift+P',()=>{void runtime.call('peko.settings',{patch:{clickThrough:!state.settings.clickThrough}}).then(value=>{state.settings={...value,...geometryPatch()};applyWindowSettings();publish();}).catch(fail);});}
     screen.on('display-removed',()=>applyWindowSettings());screen.on('display-metrics-changed',()=>applyWindowSettings());
-    setInterval(()=>{if(petReady&&(!test||process.env.PEKO_TEST_GAZE)){const point=screen.getCursorScreenPoint(),bounds=pet.getBounds();pet.webContents.send('avatar-gaze',{x:Math.max(-1,Math.min(1,(point.x-bounds.x-bounds.width/2)/(bounds.width/2))),y:Math.max(-1,Math.min(1,-(point.y-bounds.y-bounds.height/2)/(bounds.height/2))),visible:pet.isVisible()||test});}},33).unref();
+    setInterval(()=>{if(petReady&&(!test||process.env.PEKO_TEST_GAZE)){const point=screen.getCursorScreenPoint(),bounds=pet.getBounds();pet.webContents.send('avatar-gaze',{x:Math.max(-1,Math.min(1,(point.x-bounds.x-bounds.width/2)/(bounds.width/2))),y:Math.max(-1,Math.min(1,-(point.y-bounds.y-bounds.height/2)/(bounds.height/2))),visible:pet.isVisible()||test,clientX:point.x-bounds.x,clientY:point.y-bounds.y,inside:point.x>=bounds.x&&point.x<bounds.x+bounds.width&&point.y>=bounds.y&&point.y<bounds.y+bounds.height});}},33).unref();
     await pet.loadURL('about:blank');
     await chat.loadURL('peko-app://app/starting.html');
     await startRuntime();

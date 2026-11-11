@@ -5,6 +5,7 @@ import {CubismMatrix44} from '../../vendor/cubism-web-framework/src/math/cubismm
 import {CubismShaderManager_WebGL} from '../../vendor/cubism-web-framework/src/rendering/cubismshader_webgl';
 import {CubismEyeBlink} from '../../vendor/cubism-web-framework/src/effect/cubismeyeblink';
 import {CubismBreath,BreathParameterData} from '../../vendor/cubism-web-framework/src/effect/cubismbreath';
+import {PET_WIDTH,PET_HEIGHT} from '../../desktop/pet-geometry';
 import type {Cue} from '../../desktop/cues';
 declare const window:any;
 
@@ -14,7 +15,7 @@ class Avatar extends CubismUserModel {
   layers=new Set<string>();mix:Record<string,number>={};params:Record<string,number>={};expires=0;
   scale=1;gaze={x:0,y:0};visible=true;activeUntil=0;last=performance.now();clock=0;
   settings:any;descriptor:any;gl:WebGLRenderingContext;canvas:HTMLCanvasElement;
-  catalog:any;
+  catalog:any;bufferResizes=0;draws=0;
   async initialize(descriptor:any,canvas:HTMLCanvasElement){
     this.descriptor=descriptor;this.canvas=canvas;
     const gl=canvas.getContext('webgl',{alpha:true,premultipliedAlpha:true,preserveDrawingBuffer:true,antialias:true});if(!gl)throw new Error('当前设备无法初始化 WebGL');this.gl=gl;
@@ -30,7 +31,7 @@ class Avatar extends CubismUserModel {
     this._physics?.stabilization(this._model);this._model.saveParameters();
     const groups=new Set(this._model.getDrawableMasks().filter(mask=>mask.length).map(mask=>[...mask].sort((a,b)=>a-b).join(',')));
     const buffers=groups.size<=36?1:Math.ceil(groups.size/32);
-    this.createRenderer(canvas.width,canvas.height,buffers);const renderer=this.getRenderer();renderer.startUp(gl);renderer.setIsPremultipliedAlpha(true);
+    this.createRenderer(canvas.width,canvas.height,buffers);const renderer=this.getRenderer();renderer.setClippingMaskBufferSize(2048);renderer.startUp(gl);renderer.setIsPremultipliedAlpha(true);
     renderer.loadShaders('peko-app://pet/shaders/');
     await new Promise<void>((resolve,reject)=>{const shader=CubismShaderManager_WebGL.getInstance().getShader(gl);const check=()=>shader._isShaderLoaded?resolve():!shader._isShaderLoading?reject(new Error('Live2D 着色器加载失败')):requestAnimationFrame(check);check();});
     for(let i=0;i<settings.getTextureCount();i++){
@@ -47,9 +48,9 @@ class Avatar extends CubismUserModel {
     this.resize();for(let i=0;i<60;i++)this.update(1/60);this.draw();
     return {parameters:this._model.getParameterCount(),drawables:this._model.getDrawableCount(),clippingGroups:groups.size,maskBuffers:buffers};
   }
-  inspect(){const parameters:Record<string,number>={};for(let i=0;i<this._model.getParameterCount();i++)parameters[this._model.getParameterId(i).getString()]=this._model.getParameterValueByIndex(i);return {parameters,clock:this.clock,mix:this.mix,layers:[...this.layers],visible:this.visible,scale:this.scale,weights:Object.fromEntries([...this.expressions].map(([name,value])=>[name,value.weight])),motionFinished:this._motionManager.isFinished(),contextLost:this.gl.isContextLost()};}
+  inspect(){const parameters:Record<string,number>={};for(let i=0;i<this._model.getParameterCount();i++)parameters[this._model.getParameterId(i).getString()]=this._model.getParameterValueByIndex(i);return {parameters,clock:this.clock,mix:this.mix,layers:[...this.layers],visible:this.visible,scale:this.scale,weights:Object.fromEntries([...this.expressions].map(([name,value])=>[name,value.weight])),motionFinished:this._motionManager.isFinished(),contextLost:this.gl.isContextLost(),bufferResizes:this.bufferResizes,draws:this.draws,maskSize:this.getRenderer().getClippingMaskBufferSize(),highPrecisionMask:this.getRenderer().isUsingHighPrecisionMask()};}
   step(seconds:number){for(let i=0;i<Math.ceil(seconds*60);i++)this.update(1/60);this.draw();const pixels=new Uint8Array(this.canvas.width*this.canvas.height*4);this.gl.readPixels(0,0,this.canvas.width,this.canvas.height,this.gl.RGBA,this.gl.UNSIGNED_BYTE,pixels);let visible=0;for(let i=3;i<pixels.length;i+=4)if(pixels[i]>20)visible++;return {...this.inspect(),visiblePixels:visible};}
-  resize(){this.canvas.width=Math.round(innerWidth*devicePixelRatio);this.canvas.height=Math.round(innerHeight*devicePixelRatio);this.setRenderTargetSize(this.canvas.width,this.canvas.height);}
+  resize(){const width=Math.round(PET_WIDTH*this.scale*devicePixelRatio),height=Math.round(PET_HEIGHT*this.scale*devicePixelRatio);if(this.canvas.width===width&&this.canvas.height===height)return false;this.bufferResizes++;this.canvas.width=width;this.canvas.height=height;this.setRenderTargetSize(width,height);return true;}
   cue(cue:Cue){
     if(cue.clear){this.layers.clear();this.mix={};this.params={};this._motionManager.stopAllMotions();this.defaults();}
     if(Object.keys(cue.mix||{}).length)this.mix={...cue.mix};this.params={...cue.params};
@@ -75,9 +76,9 @@ class Avatar extends CubismUserModel {
     for(const [name,p]of this.overrides){p.target=Object.hasOwn(this.params,name)?1:0;p.weight+=(p.target-p.weight)*ease;if(p.weight>.0001)model.setParameterValueById(manager.getId(name),p.value,p.weight);}
     this._physics?.evaluate(model,dt);this._pose?.updateParameters(model,dt);model.update();
   }
-  draw(head=false){
+  draw(head=false){this.draws++;
     const gl=this.gl,canvas=this.canvas;gl.viewport(0,0,canvas.width,canvas.height);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);const matrix=new CubismMatrix44();
-    matrix.scale(head?(this.descriptor.avatar.portrait?.scale||3.6):canvas.height/canvas.width*this.scale*.925,head?(this.descriptor.avatar.portrait?.scale||3.6):this.scale*.925);matrix.multiplyByMatrix(this._modelMatrix);if(head)matrix.translateY(this.descriptor.avatar.portrait?.y??-1.95);
+    matrix.scale(head?(this.descriptor.avatar.portrait?.scale||3.6):canvas.height/canvas.width*.925,head?(this.descriptor.avatar.portrait?.scale||3.6):.925);matrix.multiplyByMatrix(this._modelMatrix);if(head)matrix.translateY(this.descriptor.avatar.portrait?.y??-1.95);
     const renderer=this.getRenderer();renderer.setRenderState(null,[0,0,canvas.width,canvas.height]);renderer.setMvpMatrix(matrix);renderer.drawModel();
   }
   portrait(){const width=this.canvas.width,height=this.canvas.height;this.canvas.width=512;this.canvas.height=512;this.setRenderTargetSize(512,512);this.draw(true);const image=this.canvas.toDataURL('image/png');this.canvas.width=width;this.canvas.height=height;this.setRenderTargetSize(width,height);this.draw();return image;}
@@ -92,19 +93,36 @@ async function start(){
   canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();void window.peko.invoke('avatar_error',{message:'显卡上下文已丢失，正在恢复角色',recovering:true});});
   canvas.addEventListener('webglcontextrestored',()=>location.reload());
   await window.peko.listen('avatar-state',({payload})=>payload.cancel?avatar.cancel():avatar.restore(payload.layers||{}));
-  await window.peko.listen('avatar-settings',({payload})=>{avatar.scale=payload.scale||1;avatar.activeUntil=performance.now()+2000;});
-  await window.peko.listen('avatar-gaze',({payload})=>{if(Math.abs(payload.x-avatar.gaze.x)+Math.abs(payload.y-avatar.gaze.y)>.02)avatar.activeUntil=performance.now()+250;avatar.gaze=payload;avatar.visible=payload.visible;});
+  await window.peko.listen('avatar-settings',({payload})=>{avatar.scale=payload.scale||1;if(!avatar.gl.isContextLost()&&avatar.resize())avatar.draw();avatar.activeUntil=performance.now()+2000;});
+  let hover:{x:number;y:number}|null=null,lastHit:boolean|undefined;
+  await window.peko.listen('avatar-gaze',({payload})=>{if(Math.abs(payload.x-avatar.gaze.x)+Math.abs(payload.y-avatar.gaze.y)>.02)avatar.activeUntil=performance.now()+250;avatar.gaze=payload;avatar.visible=payload.visible;if(payload.inside!==undefined)hover=payload.inside?{x:payload.clientX,y:payload.clientY}:null;});
   await window.peko.invoke('avatar_ready',{id:descriptor.id,catalog:avatar.catalog});
   await window.peko.invoke('avatar_portrait',{id:descriptor.id,png:avatar.portrait()});
-  let pointer:any,moved=false;
-  canvas.addEventListener('pointerdown',event=>{if(event.button!==0)return;pointer={x:event.screenX,y:event.screenY};moved=false;canvas.setPointerCapture(event.pointerId);});
+  let pointer:{x:number;y:number}|null=null,moved=false;
+  const endDrag=()=>{pointer=null;void window.peko.invoke('pet_drag',{active:false});};
+  canvas.addEventListener('pointerdown',event=>{if(event.button!==0)return;pointer={x:event.screenX,y:event.screenY};moved=false;canvas.setPointerCapture(event.pointerId);void window.peko.invoke('pet_drag',{active:true});});
   canvas.addEventListener('pointermove',event=>{if(!pointer)return;const x=event.screenX-pointer.x,y=event.screenY-pointer.y;if(Math.abs(x)+Math.abs(y)>3){moved=true;pointer={x:event.screenX,y:event.screenY};void window.peko.invoke('pet_move',{x,y});}});
-  canvas.addEventListener('pointerup',()=>{if(pointer&&!moved)void window.peko.invoke('pet_click');pointer=null;});
-  canvas.addEventListener('wheel',event=>{event.preventDefault();void window.peko.invoke('pet_scale',{delta:event.deltaY});},{passive:false});
-  window.addEventListener('resize',()=>avatar.resize());
-  const frame=(now:number)=>{requestAnimationFrame(frame);if(avatar.gl.isContextLost())return;try{const interval=now<avatar.activeUntil?1000/60:1000/30;if((avatar.visible||descriptor.test)&&now-avatar.last>=interval){avatar.update(Math.min(.1,(now-avatar.last)/1000));avatar.last=now;avatar.draw();}else if(!avatar.visible)avatar.last=now;}catch(error){failure(error);}};requestAnimationFrame(frame);
+  canvas.addEventListener('pointerup',()=>{if(pointer&&!moved)void window.peko.invoke('pet_click');endDrag();});
+  canvas.addEventListener('pointercancel',endDrag);canvas.addEventListener('lostpointercapture',()=>{if(pointer)endDrag();});
+  canvas.addEventListener('mousemove',event=>{hover={x:event.clientX,y:event.clientY};});
+  canvas.addEventListener('mouseleave',()=>{hover=null;});
+  canvas.addEventListener('contextmenu',event=>{event.preventDefault();void window.peko.invoke('pet_context_menu');});
+  canvas.addEventListener('wheel',event=>{event.preventDefault();const unit=event.deltaMode===1?16:event.deltaMode===2?innerHeight:1;void window.peko.invoke('pet_scale',{delta:event.deltaY*unit,anchorX:event.clientX/innerWidth,anchorY:event.clientY/innerHeight});},{passive:false});
+  const hitPixels=new Uint8Array(3*3*4);
+  const hitTest=()=>{
+    let hit=false;
+    if(pointer)hit=true;
+    else if(hover&&hover.x>=0&&hover.y>=0&&hover.x<innerWidth&&hover.y<innerHeight){
+      const x=Math.max(0,Math.min(canvas.width-3,Math.floor(hover.x*canvas.width/innerWidth)-1)),y=Math.max(0,Math.min(canvas.height-3,canvas.height-Math.floor(hover.y*canvas.height/innerHeight)-2));
+      avatar.gl.readPixels(x,y,3,3,avatar.gl.RGBA,avatar.gl.UNSIGNED_BYTE,hitPixels);for(let i=3;i<hitPixels.length;i+=4)if(hitPixels[i]>20){hit=true;break;}
+    }
+    canvas.style.cursor=pointer?'grabbing':hit?'grab':'default';
+    if(hit!==lastHit){lastHit=hit;void window.peko.invoke('pet_hit',{hit});}
+  };
+  window.addEventListener('resize',()=>{if(!avatar.gl.isContextLost()&&avatar.resize())avatar.draw();});
+  const frame=(now:number)=>{requestAnimationFrame(frame);if(avatar.gl.isContextLost())return;try{const interval=now<avatar.activeUntil?1000/60:1000/30;if((avatar.visible||descriptor.test)&&now-avatar.last>=interval){avatar.update(Math.min(.1,(now-avatar.last)/1000));avatar.last=now;avatar.draw();hitTest();}else if(!avatar.visible)avatar.last=now;}catch(error){failure(error);}};requestAnimationFrame(frame);
   window.addEventListener('beforeunload',()=>{avatar.release();CubismFramework.dispose();CubismFramework.cleanUp();});
   const contextControl=descriptor.test?avatar.gl.getExtension('WEBGL_lose_context'):null;
-  if(descriptor.test)window.__pekoAvatarTest={stats,catalog:avatar.catalog,inspect:()=>avatar.inspect(),image:()=>canvas.toDataURL('image/png'),step:(seconds:number)=>avatar.step(seconds),act:(cue:Cue)=>avatar.cue(cue),loseContext:()=>{contextControl?.loseContext();return !!contextControl;},restoreContext:()=>contextControl?.restoreContext(),debug:()=>({matrix:[...avatar.getModelMatrix().getArray()],glError:avatar.gl.getError(),opacity:avatar.getOpacity()}),capture:(cue:Cue={},steps=90)=>{avatar.cue({...cue,hold:60000});for(let i=0;i<steps;i++)avatar.update(1/60);avatar.draw();return canvas.toDataURL('image/png');},portrait:()=>avatar.portrait(),release:()=>{avatar.cancel();avatar.restore({});for(let i=0;i<90;i++)avatar.update(1/60);avatar.draw();return canvas.toDataURL('image/png');}};
+  if(descriptor.test)window.__pekoAvatarTest={stats,catalog:avatar.catalog,inspect:()=>avatar.inspect(),benchmark:(frames:number)=>{avatar.gl.finish();const start=performance.now();for(let i=0;i<frames;i++)avatar.draw();avatar.gl.finish();return (performance.now()-start)/frames;},quality:(size:number,precise=false)=>{const renderer=avatar.getRenderer();renderer.setClippingMaskBufferSize(size);renderer.startUp(avatar.gl);renderer.useHighPrecisionMask(precise);avatar.draw();return canvas.toDataURL('image/png');},image:()=>canvas.toDataURL('image/png'),step:(seconds:number)=>avatar.step(seconds),act:(cue:Cue)=>avatar.cue(cue),loseContext:()=>{contextControl?.loseContext();return !!contextControl;},restoreContext:()=>contextControl?.restoreContext(),debug:()=>({matrix:[...avatar.getModelMatrix().getArray()],glError:avatar.gl.getError(),opacity:avatar.getOpacity()}),capture:(cue:Cue={},steps=90)=>{avatar.cue({...cue,hold:60000});for(let i=0;i<steps;i++)avatar.update(1/60);avatar.draw();return canvas.toDataURL('image/png');},portrait:()=>avatar.portrait(),release:()=>{avatar.cancel();avatar.restore({});for(let i=0;i<90;i++)avatar.update(1/60);avatar.draw();return canvas.toDataURL('image/png');}};
 }
 void start().catch(error=>{console.error(error);const box=document.querySelector<HTMLElement>('#error')!;box.style.display='block';box.textContent=String(error);void window.peko.invoke('avatar_error',{message:String(error)});});
