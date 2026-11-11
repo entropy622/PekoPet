@@ -1,0 +1,12 @@
+import {build} from 'esbuild';
+import {mkdirSync,copyFileSync} from 'node:fs';
+import {join,resolve} from 'node:path';
+import {spawnSync} from 'node:child_process';
+const root=resolve(import.meta.dirname,'..');
+const frontend=spawnSync(process.execPath,[join(root,'scripts/build-frontend.mjs')],{cwd:root,stdio:'inherit'});if(frontend.status!==0)process.exit(frontend.status||1);
+for(const folder of ['electron','renderer','pet'])mkdirSync(join(root,'build',folder),{recursive:true});
+await build({absWorkingDir:root,entryPoints:['electron/main.ts'],outfile:'build/electron/main.cjs',bundle:true,platform:'node',format:'cjs',external:['electron'],target:'node24',sourcemap:true});
+await build({absWorkingDir:root,entryPoints:['electron/transport.ts'],outfile:'build/renderer/transport.js',bundle:true,platform:'browser',format:'iife',target:'chrome146',sourcemap:true});
+await build({absWorkingDir:root,entryPoints:['renderer/pet/pet.ts'],outfile:'build/pet/pet.js',bundle:true,platform:'browser',format:'iife',target:'chrome146',sourcemap:true,legalComments:'linked'});
+for(const [from,to]of [['electron/preload.cjs','build/electron/preload.cjs'],['electron/loading.html','build/electron/loading.html'],['renderer/pet/index.html','build/pet/index.html']])copyFileSync(join(root,from),join(root,to));
+console.log('Built Electron main, isolated IPC preload, React integration and Cubism Web renderer');

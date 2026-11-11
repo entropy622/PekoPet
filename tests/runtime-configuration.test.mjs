@@ -15,13 +15,13 @@ test('owned runtime shares only model, MCP and skill configuration without loadi
   assert.equal(JSON.parse(readFileSync(join(root,'package.json'),'utf8')).dependencies['@deepseek-ai/dsh'],undefined);
   assert.equal(existsSync(join(root,'node_modules/@deepseek-ai/dsh/package.json')),false);
   writeFileSync(file,readFileSync(file,'utf8')+'- id: preset-standard\n  config:\n    plugins:\n      - id: skill-filesystem\n        name: \'@deepseek-ai/dsh-skill-filesystem\'\n        config: {customSkillDirs: [custom-root]}\n      - id: must-not-load\n        name: file:///not-a-skill-or-mcp.mjs\n');
-  const value=prepareRuntime(home,{embedded:true});
+  const value=prepareRuntime(home,{desktop:true});
   assert.match(value.rows.find(row=>row.id==='agent-loop').name,/vendor\/peko-agent-loop\/index.mjs$/);
   assert.deepEqual(value.rows.find(row=>row.id==='agent-loop').config.agents,[]);
   assert.equal(value.rows.some(row=>row.id==='unrelated'),false);
   assert.equal(value.rows.find(row=>row.id==='shared-mcp').config.serverName,'shared');
   assert.equal(value.rows.find(row=>row.id==='agent-default-model').config.model,'first');
-  assert.equal(readFileSync(value.file,'utf8'),'[]\n');
+  assert.deepEqual(JSON.parse(readFileSync(value.file,'utf8')),[]);
   assert.equal(existsSync(join(home,'profiles/peko')),false);
   assert.ok(readFileSync(file,'utf8').startsWith(text));
   const preset=value.rows.find(row=>row.id==='preset-standard');assert.deepEqual(preset.config.plugins.find(p=>p.id==='skill-filesystem').config.customSkillDirs,['custom-root']);assert.equal(preset.config.plugins.some(p=>p.id==='must-not-load'),false);

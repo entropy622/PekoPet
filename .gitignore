@@ -11,4 +11,6 @@
 *.pdb
 !vendor/**
 
-/crates/pekopet/gen/
+
+/build/
+/crates/

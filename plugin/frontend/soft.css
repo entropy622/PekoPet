@@ -138,3 +138,5 @@ html body #root {position:fixed;inset:52px 0 0;height:calc(100% - 52px);margin:0
 .peko-titlebar .peko-status-error {background:#fcecf2;color:#b94b78;}
 
 @media(max-width:720px){.peko-grid{grid-template-columns:1fr}.peko-companion-main{padding:20px}.peko-titlebar{padding-left:12px}.peko-presence.is-busy{max-width:90px;overflow:hidden;white-space:nowrap}}
+
+.peko-titlebar-drag{-webkit-app-region:drag}.peko-window-controls,.peko-chat-actions,.peko-connection-error{-webkit-app-region:no-drag}

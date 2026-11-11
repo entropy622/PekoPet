@@ -1,37 +1,68 @@
 # PekoPet
 
-使用 Rust、Tauri 2、React、原生 Live2D Cubism 和自有 AgentRuntime 的 Windows 桌面搭档。
+Electron、TypeScript、React、Live2D Cubism Web 与自有 Agent Runtime 构成的 Windows 桌面搭档。聊天窗口保持简洁，透明角色窗口独立运行；工具、审批、会话、记忆与提醒由 PekoPet 管理。
 
-角色窗口独立透明显示；整个主窗口使用 React，直接复用 dsh 的聊天前端，陪伴设置通过它的公开 Slot 接口扩展。模型正文流里的 `[[peko:{"motion":"wave"}]]` 标记即时驱动表情、动作和参数，聊天显示会隐藏控制标记。PekoPet 自己管理 agent loop、工具执行、审批、会话、记忆和提醒；只与 dsh 共享模型提供方、凭据引用、MCP 和 skills 配置。
+桌面通过本地 `peko-app://` 应用协议加载资源，使用隔离 preload 与私有 IPC 访问自己的 Node 子进程。无需启动 dsh、打开 localhost 网页或完成浏览器登录。模型 API、MCP 的对外连接仍按各自配置运行。
 
-## 在 Windows 构建
+## 本机开发
 
-需要 Rust stable MSVC、Node.js 24，以及独立的 Visual Studio Build Tools C++ 工作负载（MSVC v143、Windows SDK，含 fxc）。无需完整 VS IDE。参考 Microsoft 的 [开源开发 Build Tools 许可说明](https://devblogs.microsoft.com/cppblog/updates-to-visual-studio-build-tools-license-for-c-and-cpp-open-source-projects/)。
+需要 Node.js 24 和 Git。日常构建使用 TypeScript/esbuild，无需 Rust、Tauri、Cubism Native 或 MSVC 工具链。
 
 ```powershell
 git clone https://github.com/entropy622/PekoPet.git
 cd PekoPet
-git submodule update --init --recursive vendor/cubism-framework
 npm ci
-```
-
-从 Live2D 官网取得 Cubism Native 5-r.5 SDK，阅读并接受其许可，解压后导入清单允许再分发的文件。
-
-Windows 库随仓库提供。Core 头文件未列入官方再分发清单，导入器将其保存到本机 `local/cubism-core/include`，不会入库。
-
-```powershell
-./scripts/import-sdk.ps1 -SdkPath D:/SDK/CubismSdkForNative-5-r.5
 npm run assets
 npm run dev
 ```
 
-已有 clone 可运行 `git submodule update --init --recursive vendor/cubism-framework` 补齐公开 Framework。使用其他已有角色时运行 `npm run assets -- --all`。模型缓存保留原作者署名和使用说明。已获取私有库中的对应角色时，启动脚本直接使用私有资源，不再下载缓存副本。
+`npm ci` 安装 Electron；`npm run dev` 增量构建并启动。只构建可运行 `npm run build`。也可双击根目录的 `start.bat`，脚本按自身位置定位工程，支持中文和空格路径。
 
-### 私有 Live2D 资源库
+Cubism Web 5-r.5 的 Framework、GLSL 着色器及清单允许的 Core 运行文件随源码提供，保留原许可；使用前请阅读 [Live2D 专有软件许可](https://www.live2d.com/eula/live2d-proprietary-software-license-agreement_en.html) 与 [开放软件许可](https://www.live2d.com/eula/live2d-open-software-license-agreement_en.html)。
 
-`models` 是 [entropy622/Live2DModels](https://github.com/entropy622/Live2DModels) 私有仓库的 submodule。它独立于 PekoPet，其他个人项目可直接将同一仓库作为 submodule 使用。资源清单在库内的 `catalog.json`，保留原模型目录、文件名和作者说明，二进制使用 Git LFS。
+## 使用便携版
 
-有仓库访问权的电脑运行：
+解压 Windows x64 ZIP，从托盘退出旧版 PekoPet，再运行 `start.bat` 或 `PekoPet.cmd`。首次启动缓存默认角色，后续可直接打开 `PekoPet.exe`。Electron、Chromium 和独立 Node 运行时随包提供，无需系统 WebView2。
+
+从 Rust/Tauri 版本升级时，原 `DSH_HOME/peko-pet` 中的会话、记忆、人格和提醒继续使用。Electron 窗口偏好使用自己的 userData；旧版 WebView 的 cookie 不参与新应用启动。请先退出旧版，避免两个 Agent Runtime 同时操作同一会话。
+
+默认角色为 Yumi。若保存的私有角色在当前电脑尚未安装，聊天仍可使用，并显示资源提示；在角色调试中选择已安装角色即可恢复桌宠。
+
+## 共享 dsh 配置，独立管理 Agent
+
+默认读取 `DSH_HOME`，未设置时使用 `~/.dsh`。共享来源为：
+
+- `profiles/desktop/cordis.patch.yml` 与 home 层补丁中的模型提供方、默认模型、MCP 和 skills。
+- 原有凭据引用和管理存储，以及自定义 skill 目录。
+
+不加载 dsh CLI、desktop 启动树、用户启动插件、权限覆盖或展示层，也不创建 `profiles/peko`。在 PekoPet 修改模型配置时，仅写回相应共享条目；检测到外部修改时要求重新加载。其他应用设置保存在 `DSH_HOME/peko-pet/config.patch.yml`。
+
+应用自行启动和回收 Node Agent Runtime。loop 源码在 `vendor/peko-agent-loop/src`，服务组合在 `agent/composition.yml`，固定的空入口 `agent/entry.yml` 将模块解析锚定在应用安装目录；用户配置在内存中合成。数据保存在 `DSH_HOME/peko-pet`：
+
+- `sessions`、`attachments/v1`：会话与引用附件。
+- `state.sqlite3`：人格、记忆、角色状态与会话索引。
+- `storages`：提醒等运行状态。
+- `icons`、`logs`：本机生成的角色头像和运行日志。
+
+旧版会话布局首次升级时会复制 PekoPet 管理的根会话、子会话、附件及提醒，保留原会话文件。提醒交接会停用旧库中的 PekoPet 提醒，保留其他任务。已完成该迁移的电脑直接沿用现有数据。
+
+## 聊天与桌宠
+
+- 点击角色打开聊天；拖动移动，滚轮缩放。角色窗口默认不抢焦点。
+- `Ctrl+Alt+P` 唤起聊天，`Ctrl+Alt+Shift+P` 切换鼠标穿透。
+- 关闭聊天保留桌宠和任务，托盘“退出 PekoPet”结束应用。
+- 标题栏提供聊天记录、新对话和更多选项；工作选项按需展开。
+- 审批、用户提问、错误和停止按钮在需要时显示，权限沿用 PekoPet 的工具策略。
+- “共同记忆”支持查看、修改、删除、暂停与清空；删除内容不会从旧消息自动重新提取。
+- “相处方式”配置人格、主动陪伴与勿扰。应用不主动截图或观察前台软件。
+- “模型与配置”显示共享目录与运行状态；空闲时“重新加载配置”生效，不重复提交任务。
+- “角色调试”热切换已安装角色，预览表情、持续姿势、道具、动作和实际参数范围。
+
+默认每天最多主动问候两次，空闲 60 分钟后、09:00—22:00 本地时间生效，可关闭或调整。提醒使用持久化 Schedule。
+
+## 私有 Live2D 资源库
+
+`models` 是 [entropy622/Live2DModels](https://github.com/entropy622/Live2DModels) 私有仓库的 submodule，可供其他个人项目复用。具有访问权的电脑可运行：
 
 ```powershell
 git lfs install
@@ -40,72 +71,19 @@ git -C models lfs pull
 node models/scripts/validate.mjs
 ```
 
-当前收录草莓兔兔 DLC、DeepSeek-chan、Yumi、冰糖和艾莲。PekoPet 优先使用私有库资源，原缓存与本机导入路径保持可用。草莓兔兔在“更多选项 → 角色调试 → 角色”中选择 **草莓兔兔 DLC**，退出托盘后重新启动生效。支持 13 种情绪表情、5 个持续手势／道具层和 4 个原始动作；水印、发型与游戏按键不会作为语义表情暴露。
+收录 Yumi、冰糖、艾莲、DeepSeek-chan 和草莓兔兔 DLC。PekoPet 优先读取私有库，再使用现有缓存或本机导入路径。模型原文件、作者说明和署名保留；二进制由 Git LFS 管理。公开 CI 和便携包不包含私有模型。无私有库访问权也可构建，并使用 `npm run assets` 缓存默认角色；`npm run assets -- --all` 缓存其他原有评估角色。
 
-立绘：赛博撸猫人；建模：糖糖锦鲤。原说明要求不要二传。模型限已获授权的个人用途，私有库存储不扩大使用授权。公开仓库只记录 submodule 地址与固定版本；CI 只拉取公开 Framework，公开便携目录及 ZIP 均排除私有模型。无私有库访问权也可正常构建，并通过原缓存使用默认角色。
+草莓兔兔 DLC：立绘 赛博撸猫人，建模 糖糖锦鲤。提供 13 种情绪、5 个持续手势／道具层和 4 个原始动作；水印、发型与游戏按键不暴露为语义情绪。原说明要求不要二传，私有存储不扩大原使用授权。
 
-### 本机 DeepSeek-chan 模型
-
-使用作者提供的完整解压目录导入：
+DeepSeek-chan（大肥鱼）：原画及拆分 神宫凉子，Live2D 建模 霓虹猫_NeonNeko。已有本机导入仍有效，也可用完整原包导入：
 
 ```powershell
-node scripts/import-deepseek.mjs "C:/Users/你的用户名/Downloads/DeepSeek免费公皮"
+node scripts/import-deepseek.mjs "模型压缩包解压目录"
 ```
 
-导入后，在“更多选项 → 角色调试 → 角色”选择 **DeepSeek-chan（大肥鱼）**，退出托盘后重新启动。角色外观与人格分别设置。
+## 即时角色控制
 
-手动导入保存于项目的 `local/models/deepseek`，保留 DeepSeek 原目录、文件名和使用须知，不复制 PSD。也可使用上述私有资源库。原画及拆分：神宫凉子；Live2D 建模：霓虹猫_NeonNeko。附带须知禁止重新分发完整模型，这些资源不进入公开仓库或便携包。换电脑后可在本人授权范围内拉取私有 submodule，或自行取得原包再次导入。
-
-模型开发时可用原生离屏检查入口，不显示桌宠或托盘，也不连接模型提供方：
-
-```powershell
-$env:PEKO_ROOT = (Get-Location).Path
-Start-Process ./target/release/pekopet.exe -ArgumentList '--check-avatar','deepseek','work/deepseek-native' -Wait -WindowStyle Hidden
-```
-
-输出包含各表情、持久层、动作、注视及回落截图，以及实际参数范围的 `report.json`。这些生成文件留在忽略的 `work` 目录。
-
-### 双击启动
-
-源码目录准备好上述依赖后，双击根目录的 `start.bat`，自动缓存模型、增量构建并启动。脚本以自身所在目录为基准，移动项目目录后仍可使用，支持包含空格和中文的路径。
-
-同一脚本也可放在便携包的 `pekopet.exe` 旁边，使用随包 Node 和现有 `PekoPet.cmd` 启动，无需编译；原有 `PekoPet.cmd` 保持可用。后续打包会同时包含两个入口。
-
-### 本地界面开发
-
-装好独立 Build Tools 后，在项目目录运行：
-
-```powershell
-npm run dev
-```
-
-此命令自动加载本机 x64 C++ 开发环境，用 Cargo 增量构建并启动原生程序。PekoPet 的界面扩展位于 `plugin/frontend`；聊天与输入区源码固定在 `vendor/dsh-ui-chat` 和 `vendor/dsh-ui-conversation`，保留 dsh 的编辑器、会话、工具、审批与问题组件。局部调整包括控制标记显示过滤、陪伴文案和简洁布局所需的语义属性，来源见各目录的 `SOURCES.md`。通过 npm override 加载相同包标识。修改这些 JS/CSS 文件不触发 Rust 重编译。运行 `npm run build:frontend`，再在应用中重新加载配置即可加载更新。只编译可用 `npm run build`。发布便携包仍使用 `npm run package:windows`；GitHub Actions 保留测试与发布候选包构建。
-
-运行 `npx playwright install webkit` 准备 WebKit 测试浏览器，再运行 `npm run check:ui`。测试在屏幕外的原生 Tauri/WebView2 窗口检查界面，通过 CDP 操作组件，并使用无头 WebKit 检查同一套 React 前端。它运行 PekoPet 自有 loop 的脚本模型，使用临时 DSH_HOME 和项目目录；文件工具只操作该测试目录，不移动系统鼠标、不激活前台窗口。截图和报告写入 `work/ui-checks`。标题栏、任务栏与托盘图标使用本机 Live2D 模型渲染的大头图，缓存于 `DSH_HOME/peko-pet/icons`，附带作者信息。
-
-便携包首次运行使用 `PekoPet.cmd`，它会缓存默认模型再打开程序。此后可以直接打开 `pekopet.exe`。Node 随便携包提供，运行模型缓存无需 Git。
-
-## 第一次使用
-
-启动 PekoPet 即可使用，应用自动启动并回收自己的 Node AgentRuntime，无需安装或启动 dsh。loop 源码位于 `vendor/peko-agent-loop/src`，应用组合与生命周期位于 `agent/`。
-
-默认共享 `DSH_HOME`（未设置时为 `~/.dsh`）。配置读取层只采纳 `profiles/desktop/cordis.patch.yml` 与 home 补丁中的模型提供方、默认模型、MCP 和 skills 项；凭据继续通过原有 `.credentials.yaml` 与环境引用解析。desktop 的启动插件、loop、权限策略和 UI 不会加载，也不创建 `profiles/peko`。在 PekoPet 中编辑模型配置时，写回相同共享配置项。
-
-PekoPet 的会话、附件、提醒等运行数据保存在 `DSH_HOME/peko-pet`。首次成功启动会复制旧版 PekoPet 索引中的会话及其子会话、引用附件和提醒，原会话数据保留；PekoPet 提醒交接后停用原调度记录，恢复记录写入本机迁移记录，避免两边重复触发。首次升级前退出旧版 PekoPet 及正在使用旧提醒库的 dsh 实例。迁移未提交时失败会回收本次新增副本。人格与长期记忆继续使用原 PekoPet 状态库。
-
-- 点击桌宠打开聊天，拖动角色移动位置，滚轮缩放。
-- `Ctrl+Alt+P` 唤起聊天，`Ctrl+Alt+Shift+P` 切换鼠标穿透。
-- 托盘菜单提供置顶、显示、隐藏与退出。关闭聊天保留桌宠。
-- 默认打开简洁对话页，输入框停靠底部；标题栏提供聊天记录、新对话与更多选项。
-- “更多选项 → 工作选项”展开工作区、模型与权限控件。工具审批、用户提问和停止生成在需要时直接显示。
-- “更多选项”打开陪伴设置、角色调试与勿扰开关；左上角返回聊天。
-- 界面使用 PekoPet 品牌，关闭上游产品公告、预览说明、登录引导与产品反馈入口；模型提供方配置和名称继续保留。
-- “共同记忆”可编辑、删除、清空或暂停自动记忆。
-- “相处方式”修改人格，选择陪伴频率；主动陪伴和勿扰分别控制。
-- “模型与配置”显示共享目录与 PekoPet 运行状态。外部配置变更后，在空闲时点击“重新加载配置”；界面恢复原会话，不自动重发工作操作。
-- “角色调试”预览表情、动作、持久层和参数范围；固定角色选择在重启后生效。
-
-## 表情协议
+模型可在正文流插入短标记：
 
 ```text
 [[peko:{"mix":{"星星眼":0.8,"泪汪汪":0.2},"hold":2500}]]这个效果我喜欢！
@@ -114,41 +92,40 @@ PekoPet 的会话、附件、提醒等运行数据保存在 `DSH_HOME/peko-pet`�
 [[peko:{"motion":"wave"}]]回来啦。
 ```
 
-使用当前角色目录中的实际名称。表情采用权重混合，持久层使用布尔开关，参数值按模型范围裁剪。只有当前主会话的 assistant 正文能触发角色控制；代码块、工具输出、思考内容和历史回放不触发动作。
+使用当前角色目录中公布的名称，参数按真实范围裁剪。TypeScript 增量解析器处理跨 chunk 标记，闭合后立即通过 IPC 更新 WebGL；聊天显示和复制内容隐藏标记，会话原文保留。代码、思考、工具结果、子任务和历史回放不驱动角色。重复 chunk 不重复执行；取消清理临时表现，持续层保留到关闭或切换角色。
 
-角色提示引导日常聊天在正文开头主动配轻微表情或姿态，通常保持 4—6 秒；工作回复在有意义的节点表达，严肃内容保持克制。示例由当前角色的实际名称和参数范围生成，包含轻微微笑参数，避免总用夸张特效。更新提示后，在“模型与配置”中重新加载配置即可加载。
+Cubism 保留原物理、呼吸、眨眼和注视。普通帧率 30 FPS，交互时提升至 60 FPS，隐藏时暂停绘制。人格和外观分别配置。
 
 ## 测试与打包
 
 ```powershell
 npm test
-cargo test -p peko-core --locked
-node scripts/smoke-dsh.mjs
-node scripts/e2e-dsh.mjs
-node scripts/e2e-work.mjs
+npm run typecheck
+npm run build
+npm run check:ui
+node scripts/smoke-agent.mjs
 npm run package:windows
 ```
 
-`npm test` 中的 bridge 用例使用本地脚本模型，经过 PekoPet 自有 loop，不需要 API Key。`smoke-dsh` 检查自有运行时启动、共享配置读取与关闭；`e2e-dsh` 使用当前真实模型，会消耗少量额度。原生 UI 的显示、模型效果与长时间运行验收见 [验收记录](docs/ACCEPTANCE.md)。
+离屏检查使用真实隐藏 Electron 窗口、隔离 DSH_HOME、持久测试 userData、脚本模型和临时项目，不移动系统鼠标、不抢焦点、不注册托盘或全局快捷键。覆盖连续启动、重启、配置重载、原始聊天组件、工具、审批、提问、停止、记忆、历史和真实 WebGL 模型。截图及报告保存在忽略的 `work/electron-checks`。
 
-`e2e-dsh` 可通过 `PEKO_TEST_PROVIDER` 和 `PEKO_TEST_MODEL` 指定已有测试路由，不改动 dsh 配置。
+`smoke-agent` 检查运行时启动与共享配置；`e2e-agent` 和 `e2e-work` 使用当前真实模型，会消耗额度。可通过 `PEKO_TEST_PROVIDER` 与 `PEKO_TEST_MODEL` 选择已有测试路由。
 
-公开仓库的 Windows CI 运行 Node 测试、Rust 核心测试、Tauri 类型检查、原生 Cubism 编译与链接，并生成 Windows x64 便携包。构建产物位于成功工作流的 `PekoPet-portable-windows-x64` artifact。`PEKO_TYPECHECK=1` 仅用于 `cargo check`，不生成原生程序。
+便携打包默认输出 `dist/PekoPet-windows-x64` 和同名 ZIP。可用 `--destination` 指定新目录，`--no-zip` 仅构建便携目录。独立 Node 的原生依赖按 Node ABI 准备；Electron 渲染器不加载这些模块。
 
-## 手动发布 GitHub Release
+## GitHub Actions 与发布
 
-打开 Actions → **Publish release** → **Run workflow**，选择 `main` 后运行。工作流固定检出 `main`，复用 Windows 检查与打包，再将 ZIP 上传到对应版本的 GitHub Release。默认勾选预览版，首版为 `v0.1.0`。
+Windows checks 运行构建、类型检查、Node 测试和隐藏 Electron 验收，并生成便携候选包。公开 CI 不拉取私有 submodule。
 
-版本号取自 `package.json`，需要与 Cargo workspace 和 Tauri 配置一致。发布成功的版本不会被覆盖；下一版先更新三处版本号再手动运行。上传完成后才公开 Release。若发布步骤失败，重新运行失败的发布任务可继续同一提交的草稿。
+发布仍需手动运行 Actions → Publish release，固定构建 main。版本取自 package.json；已发布标签保留。下一版先更新版本，再运行工作流，上传完成后公开 Release。本次迁移为 0.2.0，未自动覆盖旧版本发布。
 
-## 目录与许可
+## 代码位置与许可
 
-`crates/peko-core` 是流式协议与角色状态；`crates/pekopet` 是 Tauri 桌面壳和 Rust 角色协议桥；`native` 是 Cubism/Win32 桥接；`agent` 是自有运行时、共享配置适配和迁移；`vendor/peko-agent-loop` 是应用维护的 loop 源码；`plugin` 是运行时能力和 React 界面扩展；`vendor/dsh-ui-chat` 与 `vendor/dsh-ui-conversation` 保留固定版本的 MIT 聊天、输入区源码及来源；`scripts` 提供启动、模型缓存、SDK 导入和打包。
+- `electron`：主进程、隔离 preload、本地协议与界面 transport。
+- `desktop`：运行时子进程、增量角色协议和模型路径。
+- `renderer/pet`：透明窗口内的 Cubism WebGL 渲染。
+- `agent`：应用自有运行时、配置共享、IPC carrier 和迁移。
+- `plugin`：陪伴、记忆和 React 界面扩展。
+- `vendor`：固定版本的 loop、React 组件及许可允许的 Cubism Web 文件。
 
-自有代码为 MIT，第三方组件和模型保留各自许可，见 [第三方说明](THIRD_PARTY.md)。首版使用固定角色目录。SDK 和模型的公开分发按其各自授权处理。
-
-## 平台与 WebView
-
-当前交付目标为 Windows x64，主窗口使用系统 Edge WebView2，并依赖 Microsoft Visual C++ x64 运行库。运行便携包无需 Visual Studio 或 Rust；缺少 `MSVCP140.dll` 时安装 [Visual C++ Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist)。WebView2 缺失时可从 Microsoft 安装 Evergreen Runtime。主窗口与独立的 Live2D 窗口分别管理，关闭聊天保留桌宠，从托盘退出才结束应用。
-
-React 页面共用同一套组件与样式。macOS 的 WKWebView、Linux 的 WebKitGTK 具有不同的浏览器能力；无头 WebKit 检查覆盖前端兼容性，目标系统的输入法、剪贴板、窗口与打包仍需分别验收。当前 Win32／DirectComposition／D3D11 桌宠层需要对应平台实现后再发布其他平台。
+自有代码为 MIT，第三方组件与模型保留各自许可，见 [第三方说明](THIRD_PARTY.md)。当前交付目标为 Windows x64；其他平台的窗口交互与打包分别验收。实际测试记录见 [验收记录](docs/ACCEPTANCE.md)。

@@ -1,4 +1,4 @@
-import {readFileSync,existsSync,mkdirSync,writeFileSync} from 'node:fs';
+import {readFileSync,existsSync,mkdirSync} from 'node:fs';
 import {dirname,join,resolve} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import yaml from 'js-yaml';
@@ -39,8 +39,8 @@ export function sharedLayers(home,base){
   }
   return {layers,sources,presetConfigs,defaultSharedFile:files[0]};
 }
-export function prepareRuntime(home,{embedded=false,extraPatches=[]}={}){
-  home=resolve(home);const data=join(home,'peko-pet'),directory=join(data,'runtime');mkdirSync(directory,{recursive:true});
+export function prepareRuntime(home,{desktop=false,extraPatches=[]}={}){
+  home=resolve(home);const data=join(home,'peko-pet');mkdirSync(data,{recursive:true});
   let base=read(join(root,'agent/composition.yml'));
   function rewrite(rows){return rows.filter(row=>!disabled.has(row.id)).map(row=>{
     row=structuredClone(row);
@@ -48,11 +48,14 @@ export function prepareRuntime(home,{embedded=false,extraPatches=[]}={}){
     if(row.name==='@deepseek-ai/dsh-agent-preset')row.name=pathToFileURL(join(root,'agent/preset.mjs')).href;
     if(row.id==='settings'){row.name=pathToFileURL(join(root,'agent/settings.mjs')).href;delete row.disabled;}
     if(row.id==='config-editor'){row.name=pathToFileURL(join(root,'agent/config-editor.mjs')).href;delete row.disabled;}
+    if(row.id==='directory-picker'){row.name=pathToFileURL(join(root,'agent/directory-picker.mjs')).href;delete row.inject;}
     if(row.group&&Array.isArray(row.config))row.config=rewrite(row.config);
     if(row.id==='session-persistence-jsonl')row.config={...row.config,root:join(data,'sessions')};
     if(row.id==='attachment-local')row.config={...row.config,dshHome:data};
     if(row.id==='storage-json')row.config={...row.config,root:join(data,'storages')};
-    if(!embedded&&(headless.has(row.id)||row.id.startsWith('ui-')||row.name?.startsWith('@deepseek-ai/dsh-client-')))row.disabled=true;
+    if(row.id==='webserver')row.disabled=true;
+    if(row.id==='connection'){delete row.inject;row.config={};}
+    if(!desktop&&(headless.has(row.id)||row.id.startsWith('ui-')||row.name?.startsWith('@deepseek-ai/dsh-client-')))row.disabled=true;
     return row;
   });}
   base=rewrite(base);
@@ -62,7 +65,7 @@ export function prepareRuntime(home,{embedded=false,extraPatches=[]}={}){
   const own=join(data,'config.patch.yml');
   const ownedPatches=read(own);
   const extras=extraPatches.map(file=>{const rows=read(resolve(file));if(!Array.isArray(rows))throw new Error('测试补丁必须为列表');return rows;});
-  const rows=composeEntries([[{insert:base}],...shared.layers,[{insert:[{id:'peko-startup',name:pathToFileURL(join(root,'plugin/startup.mjs')).href},{id:'peko-bridge',name:pathToFileURL(join(root,'plugin/index.mjs')).href},...embedded?[{id:'peko-web-runtime',name:'@deepseek-ai/dsh-web-app',config:{openBrowser:false,printUrl:false,surfaceContext:false}},{id:'peko-frontend',name:pathToFileURL(join(root,'plugin/frontend/index.mjs')).href}]:[]]}],ownedPatches,...extras]);
+  const rows=composeEntries([[{insert:base}],...shared.layers,[{insert:[{id:'peko-bridge',name:pathToFileURL(join(root,'plugin/index.mjs')).href},...desktop?[{id:'peko-frontend',name:pathToFileURL(join(root,'plugin/frontend/index.mjs')).href},{id:'peko-directory-ui',name:'@deepseek-ai/dsh-client-ui-directory-picker-native'}]:[]]}],ownedPatches,...extras]);
   const sharedSkill=shared.sources.has('skill-filesystem')?rows.find(row=>row.id==='skill-filesystem')?.config:undefined;
   for(const row of rows)if(Array.isArray(row.config?.plugins)){
     const plugins=row.config.plugins;
@@ -73,6 +76,6 @@ export function prepareRuntime(home,{embedded=false,extraPatches=[]}={}){
       else plugins.push(value);
     }
   }
-  const file=join(directory,'composition.yml');writeFileSync(file,'[]\n',{mode:0o600});
+  const file=join(root,'agent/entry.yml');
   return {file,home,data,own,rows,base,sources:shared.sources,defaultSharedFile:shared.defaultSharedFile};
 }

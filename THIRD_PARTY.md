@@ -1,29 +1,28 @@
 # Third-party components
 
-PekoPet-authored code is MIT. The repository MIT license does not relicense these components.
+PekoPet-authored code is MIT. Model assets and third-party components retain their own licenses.
 
 | Component | Version | License / source |
 |---|---|---|
-| Tauri | 2.12.5 | Apache-2.0 OR MIT; tauri-apps/tauri |
-| Tauri opener plugin | 2.7.2 | Apache-2.0 OR MIT; tauri-apps/plugins-workspace |
-| React / React DOM | dsh frontend bundle | MIT; Meta Platforms and contributors |
-| DeepSeek Harness component libraries and frontend | 0.2.1-alpha.4 | MIT; reused npm distribution; local source reference 86a402200d95fecef4529d969836f1fe13c6cb0d |
-| PekoPet agent-loop source fork | 0.2.1-alpha.4 / same pinned commit | MIT; vendor/peko-agent-loop retains original source, LICENSE and SOURCES.md |
-| PekoPet session control and settings forms | same pinned commit | MIT adaptations from SDK server and settings; agent/LICENSE and agent/SOURCES.md |
-| dsh Chat and Conversation source forks | same pinned commit | MIT; vendor/dsh-ui-chat and vendor/dsh-ui-conversation retain LICENSE and SOURCES.md with local changes |
-| Cubism Native Framework | 5-r.5, 145155d2c5bdd8d23475cef9cc3ab46d3220190c | Live2D Open Software License; vendor/cubism-framework/LICENSE.md |
-| Cubism Core | Native 5-r.5 | Live2D Proprietary Software License; only files listed as redistributable may be included |
+| Electron | 45.3.0 | MIT; bundled Chromium and third-party notices are retained in the portable application |
+| Node.js | 24.x, exact bundled build recorded by its binary | Node.js license; LICENSE-NODE in portable outputs |
+| React / React DOM | pinned dsh frontend distribution | MIT; Meta Platforms and contributors |
+| DeepSeek Harness component libraries | 0.2.1-alpha.4 | MIT; source baseline 86a402200d95fecef4529d969836f1fe13c6cb0d |
+| PekoPet agent-loop fork | same baseline | MIT; vendor/peko-agent-loop LICENSE and SOURCES.md |
+| Session controller and settings adaptations | same baseline | MIT; agent/LICENSE and agent/SOURCES.md |
+| dsh Chat and Conversation forks | same baseline | MIT; vendor/dsh-ui-chat and vendor/dsh-ui-conversation retain LICENSE and SOURCES.md |
+| Cubism Web Framework and GLSL shaders | SDK for Web 5-r.5 | Live2D Open Software License; vendor/cubism-web-framework/LICENSE.md |
+| Cubism Core for Web | SDK for Web 5-r.5 | Live2D Proprietary Software License; vendor/cubism-web-core/LICENSE.md and RedistributableFiles.txt |
 
-Yumi is by Erara_艾拉拉. Ice Sugar and Ellen assets retain their creators' restrictions from the original LLM_Live2D repository. The asset setup script caches these models for local evaluation. They are not committed or included in the portable package. Portrait PNG/ICO files generated from them remain in the same local cache with attribution. A local build can use its cached Yumi icon; public CI uses the PekoPet-authored fallback icon.
+Only live2dcubismcore.min.js and live2dcubismcore.d.ts from the Core runtime are included, as listed in its redistribution manifest. Core source maps and unrelated SDK files are not included. The repository owner authorized the official Web SDK download and both Live2D agreements on 2026-11-11. Third-party npm license notices remain with their packages in the private Node runtime.
 
-## Private Live2D asset library
+## Models and portraits
 
-The optional `models` submodule references the private entropy622/Live2DModels repository. It stores the owner's personal copies of the fixed characters and their original notices, with binary assets in Git LFS. The public source contains only a gitlink, integration metadata and code. Public CI does not fetch this submodule; portable packages and archives exclude its assets. Shared private storage grants no additional model rights. Keep access restricted to the owner and follow each original notice for every consuming project.
+The optional models submodule references the private entropy622/Live2DModels repository. It contains personal copies and the supplied author notices. Public source records only a gitlink and integration metadata. Public CI does not fetch this library, and portable outputs exclude its contents. Keep the library private and follow each creator's original terms in every consuming project. Generated portraits remain in the user's local cache with attribution.
 
-Strawberry Rabbit DLC（草莓兔兔）: illustration by 赛博撸猫人; Live2D modeling by 糖糖锦鲤. Imported from the user-supplied 草莓兔兔-DLC+(2).zip with the original 草莓猫猫兔使用说明.txt retained. The notice requests no reuploading. Its watermark, hairstyle and game-button expressions are excluded from semantic emotion control. Runtime expressions and motions are discovered from the original files without rewriting them. Derived portraits remain in the local cache and are excluded from public distribution.
+- Yumi: Erara_艾拉拉. The original LLM_Live2D source revision is fixed in assets/model-files.json.
+- Ice Sugar: 神宫凉子. Ellen: 神宫凉子 / 杨小唸. Retain their original restrictions and notices.
+- DeepSeek-chan（大肥鱼）: original art and separation by 神宫凉子; modeling by 霓虹猫_NeonNeko. Its supplied notice restricts complete-model redistribution. The local importer retains the runtime directory and notice and omits authoring PSD files.
+- Strawberry Rabbit DLC（草莓兔兔）: illustration by 赛博撸猫人; modeling by 糖糖锦鲤. Imported from the user-supplied 草莓兔兔-DLC+(2).zip with 草莓猫猫兔使用说明.txt retained. The notice requests no reuploading. Watermark, hairstyle and game-button controls stay outside the semantic emotion catalog.
 
-The Cubism Core importer retains its license and redistribution list. The official SDK download requires accepting Live2D's license agreements. Model-import expansion and public binary distribution require a release-license review separate from source-code development.
-
-## DeepSeek-chan local model
-
-DeepSeek-chan（大肥鱼）: original art and separation by 神宫凉子; Live2D modeling by 霓虹猫_NeonNeko. The supplied usage notice permits personal use and parameter adjustments and prohibits redistributing or reuploading the complete model. `scripts/import-deepseek.mjs` copies the runtime folder and its original usage notice into ignored `local/models/deepseek`, preserving their names. Model assets, thumbnails and derived portraits are excluded from the public repository and portable releases. The authoring PSD is not imported. This character's emotion catalog excludes clothing and body-shape controls.
+A private copy grants no additional rights. Public release licensing remains governed by the SDK and model terms. Public CI uses the PekoPet-authored fallback executable icon; runtime window and tray icons can use locally generated portraits.

@@ -3,14 +3,14 @@ import {createPortal} from 'react-dom';
 import {createSnapshotStore} from '@deepseek-ai/dsh-client-store';
 import avatarMetadata from '../../assets/avatars.json';
 const h=React.createElement,{useState,useEffect,useRef,useSyncExternalStore,useCallback}=React;
-  const invoke=(command,args={})=>window.__TAURI__.core.invoke(command,args);
+  const invoke=(command,args={})=>window.peko.invoke(command,args);
   const request=(method,params={})=>invoke('peko_request',{method,params});
   const paths={minimize:'M5 12h14',maximize:'M5 5h14v14H5Z',close:'m6 6 12 12M6 18 18 6',chat:'M4 4h16v13H9l-5 4Z',memory:'M5 4h14v17H5ZM8 9h8m-8 4h8',heart:'M12 21 3 12C-2 4 7 0 12 7c5-7 14-3 9 5Z',connect:'M8 3v5m8-5v5M6 8h12v3a6 6 0 0 1-12 0ZM12 17v5',sliders:'M3 6h18M3 12h18M3 18h18M8 3v6m8 0v6M9 15v6',moon:'M20 14A9 9 0 0 1 10 4a9 9 0 1 0 10 10Z',history:'M3 12a9 9 0 1 0 3-6M3 3v6h6M12 7v5l3 2',plus:'M12 5v14M5 12h14',more:'M5 12h.01M12 12h.01M19 12h.01',back:'m14 6-6 6 6 6'};
   const Icon=({name})=>h('svg',{viewBox:'0 0 24 24',width:18,height:18,fill:'none',stroke:'currentColor',strokeWidth:1.6,strokeLinecap:'round',strokeLinejoin:'round','aria-hidden':true},h('path',{d:paths[name]}));
   const Button=({children,primary=false,...props})=>h('button',{type:'button',...props,className:'peko-button'+(primary?' peko-primary':'')+(props.className?' '+props.className:'')},children);
   const Card=({children,...props})=>h('section',{...props,className:'peko-card'+(props.className?' '+props.className:'')},children);
   const Field=({label,...props})=>h('label',{className:'peko-field'},h('span',null,label),h('input',props));
-  function Portrait({size=36,rev=0}){const [fresh,setFresh]=useState(rev);useEffect(()=>{let live=true,off;window.__TAURI__.event.listen('peko-portrait',()=>setFresh(Date.now())).then(fn=>{if(live)off=fn;else fn();});return()=>{live=false;off?.();};},[]);return h('img',{className:'peko-portrait',src:'/peko/portrait.png?v='+fresh,alt:'角色头像',draggable:false,width:size,height:size});}
+  function Portrait({size=36,rev=0}){const [fresh,setFresh]=useState(rev);useEffect(()=>{let live=true,off;window.peko.listen('peko-portrait',()=>setFresh(Date.now())).then(fn=>{if(live)off=fn;else fn();});return()=>{live=false;off?.();};},[]);return h('img',{className:'peko-portrait',src:'/peko/portrait.png?v='+fresh,alt:'角色头像',draggable:false,width:size,height:size});}
   function CompanionPanel({tab,state,run,onChat}){
     const [memories,setMemories]=useState([]),[draft,setDraft]=useState(''),[editing,setEditing]=useState(null),[persona,setPersona]=useState(state.settings?.persona||''),[mix,setMix]=useState({}),[params,setParams]=useState({}),[clearing,setClearing]=useState(false);
     const settings=state.settings||{},catalog=state.catalog||{};
@@ -19,7 +19,7 @@ const h=React.createElement,{useState,useEffect,useRef,useSyncExternalStore,useC
       let live=true,off;
       const refresh=async()=>{const value=await request('peko.memory');if(live)setMemories(value.memories);};
       run(refresh);
-      window.__TAURI__.event.listen('peko-memory',()=>run(refresh)).then(fn=>{if(live)off=fn;else fn();});
+      window.peko.listen('peko-memory',()=>run(refresh)).then(fn=>{if(live)off=fn;else fn();});
       return()=>{live=false;off?.();};
     },[tab]);
     const update=patch=>run(()=>request('peko.settings',{patch}),'设置已保存');
@@ -44,7 +44,7 @@ const h=React.createElement,{useState,useEffect,useRef,useSyncExternalStore,useC
     const latency=state.latencies||[],sorted=[...latency].sort((a,b)=>a-b),p95=sorted.length?sorted[Math.ceil(sorted.length*.95)-1].toFixed(1)+' ms':'等待角色事件';
     return h('div',{className:'peko-panel-content'},
       h('header',null,h('h1',null,'让每个表情都刚刚好'),h('p',null,'表情可混合，姿势与道具会延续到明确关闭。')),
-      h(Card,null,h('div',{className:'peko-row'},h('h2',null,catalog.name||'正在加载角色'),h('label',null,'角色 ',h('select',{'aria-label':'角色',value:settings.avatar||'yumi',onChange:e=>update({avatar:e.target.value})},Object.entries(avatarMetadata.avatars).map(([id,avatar])=>h('option',{key:id,value:id},avatar.name))))),h('p',{className:'peko-meta'},'切换角色后重启应用生效。'),h('div',{className:'peko-grid'},(catalog.expressions||[]).map(name=>h('label',{key:name,className:'peko-range'},h('span',null,name),h('input',{type:'range',min:0,max:1,step:.05,value:mix[name]||0,'aria-label':name,onChange:e=>setMix({...mix,[name]:Number(e.target.value)})}),h('output',null,(mix[name]||0).toFixed(2))))),h(Button,{primary:true,onClick:()=>cue({mix,hold:2500})},'预览混合表情')),
+      h(Card,null,h('div',{className:'peko-row'},h('h2',null,catalog.name||'正在加载角色'),h('label',null,'角色 ',h('select',{'aria-label':'角色',value:settings.avatar||'yumi',onChange:e=>update({avatar:e.target.value})},Object.entries(avatarMetadata.avatars).map(([id,avatar])=>h('option',{key:id,value:id},avatar.name))))),h('p',{className:'peko-meta'},'切换角色后立即生效。'),h('div',{className:'peko-grid'},(catalog.expressions||[]).map(name=>h('label',{key:name,className:'peko-range'},h('span',null,name),h('input',{type:'range',min:0,max:1,step:.05,value:mix[name]||0,'aria-label':name,onChange:e=>setMix({...mix,[name]:Number(e.target.value)})}),h('output',null,(mix[name]||0).toFixed(2))))),h(Button,{primary:true,onClick:()=>cue({mix,hold:2500})},'预览混合表情')),
       h(Card,null,h('h2',null,'持续姿势与道具'),h('div',{className:'peko-actions'},(catalog.layers||[]).map(name=>{const active=state.avatarState?.layers?.[name]===true;return h(Button,{key:name,'aria-pressed':active,onClick:()=>cue({layers:{[name]:!active}})},name);}))),
       h(Card,null,h('h2',null,'动作'),h('div',{className:'peko-actions'},(catalog.motions||[]).map(name=>h(Button,{key:name,onClick:()=>cue({motion:name})},name)))),
       h(Card,null,h('h2',null,'模型参数'),h('div',{className:'peko-grid'},(catalog.parameters||[]).map(p=>h('label',{key:p.id,className:'peko-range'},h('span',null,p.id),h('input',{type:'range',min:p.min,max:p.max,step:(p.max-p.min)/100||.01,value:params[p.id]??p.default,'aria-label':p.id,onChange:e=>{const value=Number(e.target.value);setParams({...params,[p.id]:value});cue({params:{[p.id]:value},hold:1200});}}),h('output',null,(params[p.id]??p.default).toFixed(2)))))),
@@ -53,7 +53,7 @@ const h=React.createElement,{useState,useEffect,useRef,useSyncExternalStore,useC
   function useNativeState(){
     const [state,setState]=useState({}),[error,setError]=useState(''),[notice,setNotice]=useState('');
     useEffect(()=>{let live=true;const off=[];invoke('peko_state').then(value=>{if(live)setState(value);}).catch(e=>setError(String(e)));
-      window.__TAURI__.event.listen('peko-state',e=>setState(e.payload)).then(unlisten=>{if(live)off.push(unlisten);else unlisten();});
+      window.peko.listen('peko-state',e=>setState(e.payload)).then(unlisten=>{if(live)off.push(unlisten);else unlisten();});
       return()=>{live=false;for(const unlisten of off)unlisten();};
     },[]);
     const run=async(action,message='')=>{setError('');setNotice('');try{await action();setNotice(message);}catch(e){setError(String(e));}};
@@ -88,7 +88,7 @@ function Pane({tab,navigate}){
   if(!state.settings)return <main className="peko-companion-main">正在载入陪伴设置…</main>;
   return <main className="peko-companion-main">
     <nav className="peko-settings-nav" aria-label="陪伴设置">{sections.map(([id,label])=><button key={id} type="button" aria-current={tab===id?'page':undefined} onClick={()=>navigate('peko-'+id)}>{label}</button>)}</nav>
-    {(error||state.error)&&<div role="alert" className="peko-error">{error||state.error}</div>}
+    {(error||state.error||state.avatarError)&&<div role="alert" className="peko-error">{error||state.error||state.avatarError}</div>}
     {notice&&<div role="status" className="peko-notice">{notice}</div>}
     <CompanionPanel tab={tab} state={state} run={run} onChat={()=>navigate(null,true)}/>
   </main>;
@@ -116,11 +116,11 @@ function Shell({navigate,layout,sessions,current,view,onStart,onOpen}){
   return createPortal(<>
     <header className="peko-titlebar peko-chrome" data-peko-ready>
       {panel.activePanelId&&<button type="button" className="peko-icon-button" aria-label="返回聊天" onClick={()=>navigate(null)}><Icon name="back"/></button>}
-      <div className="peko-titlebar-drag" onPointerDown={event=>{if(event.button===0)action('drag');}} onDoubleClick={()=>action('maximize')}>
+      <div className="peko-titlebar-drag"  onDoubleClick={()=>action('maximize')}>
         <Portrait size={28}/><strong>Peko</strong>
-        {!state.error&&<span className={'peko-presence'+(busy?' is-busy':'')} role="status"><i/>{busy?state.status:''}</span>}
+        {!(state.error||state.avatarError)&&<span className={'peko-presence'+(busy?' is-busy':'')} role="status"><i/>{busy?state.status:''}</span>}
       </div>
-      {state.error&&<button type="button" className="peko-connection-error" title={state.error} onClick={()=>openPanel('peko-models')}>查看提示</button>}
+      {(state.error||state.avatarError)&&<button type="button" className="peko-connection-error" title={state.error||state.avatarError} onClick={()=>openPanel('peko-models')}>查看提示</button>}
       <div className="peko-chat-actions">
         <button type="button" className="peko-icon-button" aria-label="聊天记录" title="聊天记录" onClick={()=>setHistory(true)}><Icon name="history"/></button>
         <button type="button" className="peko-icon-button" aria-label="新对话" title="新对话" onClick={()=>{navigate(null,false);onStart();}}><Icon name="plus"/></button>

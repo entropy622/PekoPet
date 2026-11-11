@@ -17,9 +17,9 @@ export function apply(ctx) {
   const home=resolve(process.env.DSH_HOME||join(homedir(),'.dsh'));
   const state=new State(join(home,'peko-pet/state.sqlite3'));
   ctx.provide('pekoAvatarId',()=>state.settings().avatar);
-  const transport=new JsonRpcLineTransport(process.stdin,process.stdout);
+  const transport=ctx.get('pekoTransport')??new JsonRpcLineTransport(process.stdin,process.stdout);
   const controller=new SessionController(ctx,transport);
-  const embedded=process.env.PEKO_EMBEDDED_UI==='1', webSessions=new Set();
+  const embedded=process.env.PEKO_DESKTOP==='1', webSessions=new Set();
   let avatarCatalog;
   const owned=new Set(), pending=new Map(), avatars=new Map(), workers=new Set(),memoryResults=new Map(),proactiveRestrictions=new Map(),memoryHandles=new Map(),background=new Set(),lineage=new Map();
   function own(id){owned.add(id);lineage.set(id,id);}
@@ -48,7 +48,7 @@ export function apply(ctx) {
     const agent=typeof params.sessionId==='string'?ctx.agents.get(params.sessionId):undefined;
     const tools=agent?ctx.tools.schemas(scopeOf(agent.ctx)).map(s=>({name:s.name,description:s.description})):[];
     const skills=agent?await ctx.skills.snapshot({scope:scopeOf(agent.ctx),cwd:await ctx.workingDirectory.ensure(agent)}):{skills:[],complete:false};
-    return {frontendUrl:embedded?ctx.get('connection')?.authenticatedUrl(ctx.get('webServer').getOrigin()):undefined,version:'0.1.0',protocol:1,home,runtime:{owner:'PekoPet',loopOwner:ctx.agentLoop.owner},sharedProfile:'desktop',defaultModel:ctx.get('agentDefaultModel')?.currentSelection(),workingDirectory:agent?await ctx.workingDirectory.ensure(agent):undefined,providers:await models(),settings:state.settings(),sessions:state.sessions(),tools,skills,features:['stream','cancel','approvals','questions','memory','avatar','schedule']};
+    return {version:'0.2.0',protocol:1,home,runtime:{owner:'PekoPet',loopOwner:ctx.agentLoop.owner,transport:embedded?'ipc':'stdio'},sharedProfile:'desktop',defaultModel:ctx.get('agentDefaultModel')?.currentSelection(),workingDirectory:agent?await ctx.workingDirectory.ensure(agent):undefined,providers:await models(),settings:state.settings(),sessions:state.sessions(),tools,skills,features:['stream','cancel','approvals','questions','memory','avatar','schedule']};
   }
   function avatarContext(id) {
     const a=avatars.get(id)??(avatarCatalog?{catalog:avatarCatalog,state:state.avatarState(id)}:undefined);

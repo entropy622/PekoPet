@@ -27,12 +27,10 @@ jobs:
           submodules: false
           ref: ${{ inputs.for-release && 'main' || github.sha }}
           fetch-depth: 0
-      - name: Fetch public Cubism Framework only
-        run: git submodule update --init --recursive vendor/cubism-framework
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - uses: dtolnay/rust-toolchain@stable
+          cache: npm
       - name: Resolve build version and source
         id: metadata
         shell: pwsh
@@ -40,52 +38,32 @@ jobs:
           FOR_RELEASE: ${{ inputs.for-release }}
         run: |
           $version=(Get-Content package.json -Raw|ConvertFrom-Json).version
-          if($version -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$'){throw 'Invalid release version in package.json'}
-          $cargo=(& cargo metadata --format-version 1 --no-deps --locked)|ConvertFrom-Json
-          if($LASTEXITCODE -ne 0){throw 'Cargo version metadata failed'}
-          $tauri=(Get-Content crates/pekopet/tauri.conf.json -Raw|ConvertFrom-Json).version
-          if($tauri -ne $version -or @($cargo.packages|Where-Object{$_.version -ne $version}).Count){throw 'package.json, Cargo workspace and Tauri versions must agree'}
-          if($env:FOR_RELEASE -eq 'true' -and (git tag --list "v$version")){throw "v$version already exists; bump the main version before publishing again"}
+          if($version -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$'){throw 'Invalid release version'}
+          if($env:FOR_RELEASE -eq 'true' -and (git tag --list "v$version")){throw "v$version already exists; bump the main version before publishing"}
           "commit=$(git rev-parse HEAD)" >> $env:GITHUB_OUTPUT
           "version=$version" >> $env:GITHUB_OUTPUT
-      - uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: windows-tauri-release-v1
       - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: node node_modules/electron/install.js
       - run: npm rebuild @deepseek-ai/dsh-subprocess-local koffi node-pty protobufjs
-      - run: npm run build:frontend
+      - run: npm run build
+      - run: npm run typecheck
       - run: npm test
-      - run: cargo test -p peko-core --locked
-      - name: Type-check Tauri client
-        env:
-          PEKO_TYPECHECK: '1'
-        run: cargo check -p pekopet --locked
-      - name: Prepare SDK under the repository owner's license consent
+      - name: Cache default evaluation model for hidden Electron checks
+        run: npm run assets
+      - run: npm run check:ui
+      - name: Build portable candidate
+        if: github.repository == 'entropy622/PekoPet' && github.event_name != 'pull_request'
+        run: npm run package:windows -- --destination dist/PekoPet-windows-x64
+      - name: Check actual portable outside the source checkout
         if: github.repository == 'entropy622/PekoPet' && github.event_name != 'pull_request'
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force local/sdk | Out-Null
-          Invoke-WebRequest 'https://cubism.live2d.com/sdk-native/bin/CubismSdkForNative-5-r.5.zip' -OutFile local/sdk/native.zip
-          Expand-Archive local/sdk/native.zip -DestinationPath local/sdk
-          ./scripts/import-sdk.ps1 -SdkPath local/sdk/CubismSdkForNative-5-r.5
-      - name: Check native bridge before release optimization
-        if: github.repository == 'entropy622/PekoPet' && github.event_name != 'pull_request'
-        shell: cmd
-        timeout-minutes: 5
-        run: |
-          cargo check -p pekopet --locked > native-check.log 2>&1
-          set result=%errorlevel%
-          type native-check.log
-          exit /b %result%
-      - name: Build native portable candidate
-        if: github.repository == 'entropy622/PekoPet' && github.event_name != 'pull_request'
-        shell: cmd
-        timeout-minutes: 45
-        run: |
-          call npm run package:windows -- -DestinationPath dist/PekoPet-windows-x64 > portable-build.log 2>&1
-          set result=%errorlevel%
-          type portable-build.log
-          exit /b %result%
+          $portable=Join-Path $env:RUNNER_TEMP 'PekoPet portable'
+          Move-Item -LiteralPath (Join-Path $pwd 'dist/PekoPet-windows-x64') -Destination $portable
+          $env:PEKO_UI_EXE=Join-Path $portable 'PekoPet.exe'
+          $env:PEKO_UI_ROOT=Join-Path $portable 'resources/runtime'
+          $env:PEKO_UI_OUT=Join-Path $pwd 'work/electron-portable-checks'
+          npm run check:ui
       - uses: actions/upload-artifact@v4
         if: github.repository == 'entropy622/PekoPet' && github.event_name != 'pull_request'
         with:

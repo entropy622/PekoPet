@@ -1,0 +1,19 @@
+appId: com.entropy622.pekopet
+productName: PekoPet
+asar: true
+npmRebuild: false
+directories:
+  output: dist/electron
+files:
+  - build/**
+  - package.json
+  - '!node_modules{,/**}'
+extraResources:
+  - from: work/package-runtime
+    to: runtime
+win:
+  icon: assets/icon.png
+  executableName: PekoPet
+  target:
+    - dir
+  signAndEditExecutable: true

@@ -1,5 +1,21 @@
 # PekoPet 验收记录
 
+## Electron 迁移 · 2026-11-11
+
+当前实现使用 Electron 45.3.0、TypeScript、原 React 对话组件、独立 Node Agent Runtime 与 Cubism Web 5-r.5。以下旧版记录保留为历史证据；原生版本的长期运行数据单独列出。
+
+- 桌面资源通过 peKo 自有应用协议加载，Remote、二进制请求、事件流和取消走版本化私有 IPC。桌面运行时没有 HTTP 监听器、浏览器 token 或 cookie 登录步骤。隔离测试使用位于项目之外的 DSH_HOME，验证固定应用入口的模块解析、引导顺序、二进制 bundle、事件订阅和取消。
+- 原自有 agent loop、共享模型/MCP/skills、会话迁移、审批、问题、停止、记忆与提醒沿用既有实现。用户配置仅在内存中合成；agent/entry.yml 是随应用提供的空模块解析锚点。
+- 本机 TypeScript 主进程与 WebGL 渲染器类型检查通过。Node 单元与集成检查覆盖 49 项；静态空入口、共享配置写回、引导顺序及启动脚本的 7 项定向复测通过。IPC 编解码补测覆盖跨 V8 版本所需的字节、undefined、保留字碰撞和协议版本校验。
+- 真实隐藏 Electron 完成 26 张截图、720×760 与 600×620 全部页面、中文/emoji、标记隐藏与复制、真实文件 read/edit、允许/拒绝审批、多题与自由输入、Stop、流式结束前表情变化、人格和记忆保存。pet 窗口访问聊天特权、pet 访问 Remote 通道及非 peKo 控制请求均被拒绝。
+- Yumi、DeepSeek-chan、草莓兔兔完成真实 WebGL 透明像素、表情像素变化、持续层和热切换检查。蒙版分别使用 1、2、1 个缓冲；保留物理、呼吸、眨眼与注视。20 次本地角色事件 P95 为 7 ms，测量起点为主进程分发、终点为实际更新并提交 WebGL 绘制；模型首 token 等待独立记录。
+- 配置重新加载恢复原会话、人格和已完成文件结果，不重发工作操作。关闭聊天保留桌宠和 Agent。连续三次使用同一 Electron userData 启动，历史、人格、记忆均保留，无浏览器认证步骤。报告为 work/electron-checks/report.json，截图与日志不入库。
+- 实际 Electron 便携程序配合复制到仓库外中文/空格路径中的独立 Node 与运行资源，完成 20 张截图和三次同 userData 启动。保存的私有角色缺失时聊天保持就绪，选择已缓存 Yumi 后桌宠恢复；随后工具、审批、停止、记忆、历史和配置重载均通过，JavaScript 异常为零，本地角色事件 P95 为 2 ms。报告为 work/electron-portable-checks/report.json。
+- 本机便携目录为 dist/PekoPet-electron-windows-x64；包含实际 EXE、Chromium、独立 Node、生产依赖、SDK 运行文件和许可。打包单独复制生产 node_modules，并检查前端入口存在；CI 在源码目录之外复测实际便携程序后才上传构建产物。源码与便携版测试均不激活桌面、移动系统鼠标或注册全局快捷键。
+- 官方 Core 只收录再分发清单中的运行文件与声明，Framework 保留原源码和 GLSL 许可。公开模型排除规则与手动 release 流程测试通过。
+
+## 历史版本记录
+
 ## 启动模块预加载修复 · 2026-11-11
 
 - 用户报告入口显示 Failed to load plugins / HTML did not preload @deepseek-ai/dsh-client-modules/client.js。PekoPet 通过结构化 index injection 将固定版本的核心模块加载器放入 HTML，保持注册队列、核心注册、图清单和应用 shell 的执行顺序；其余应用包继续走原有 revision URL，聊天渲染仍由原 React 组件负责。
@@ -98,10 +114,10 @@
 | 验收项 | 下一步 |
 |---|---|
 | 桌宠桌面交互 | 在用户实际桌面检查拖动、缩放、穿透、托盘、DPI、多显示器和全局快捷键 |
-| 实际模型视觉与延迟 | 检查混合、平滑回落、物理、持久层；记录完整标记到实际绘制的 P95 与资源占用 |
-| 当前版本连续运行 | 旧原生版本完成了 7,202 秒静置；React 版本仍需两小时持续运行检查 |
-| 其他系统 | macOS / Linux 原生窗口、输入法、剪贴板和打包尚未实施；当前 Win32 / D3D11 桌宠为 Windows 专用 |
+| 完整模型动态验收 | 补充长期混合、平滑回落、全部 motion 与资源采样；当前 Electron 已通过真实模型、透明度、表情变化、持久层及本地 P95 |
+| 当前版本连续运行 | 旧原生版本完成了 7,202 秒静置；Electron 版本仍需两小时持续运行检查 |
+| 其他系统 | macOS / Linux 原生窗口、输入法、剪贴板和打包尚未实施；当前 Electron 便携构建仅验收 Windows x64 |
 
 ## 运行约定
 
-类型检查不生成原生二进制。脚本模型测试使用真实 dsh loop 和临时 DSH_HOME，独立于真实提供方的网络与额度。原生视觉、真实模型和持续运行使用单独的证据，完成后更新本记录。
+类型检查验证 TypeScript；离屏检查运行真实 Electron、真实 Cubism Web 模型与应用自有 loop，使用隔离 DSH_HOME 和临时项目。脚本模型检查独立于提供方网络与额度；桌面交互及两小时持续运行由单独的实机记录补齐。

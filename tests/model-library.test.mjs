@@ -60,8 +60,9 @@ test('strawberry control catalog keeps attribution, clothing and game buttons ou
 test('public CI initializes only public dependencies and packaging does not copy private models',()=>{
   const workflow=readFileSync('.github/workflows/windows.yml','utf8');
   assert.ok(workflow.includes('submodules: false'));
-  assert.ok(workflow.includes('git submodule update --init --recursive vendor/cubism-framework'));
+  assert.equal(workflow.includes('git submodule update'),false);
   assert.equal(workflow.includes('submodules: recursive'),false);
-  const pack=readFileSync('scripts/package.ps1','utf8');
-  assert.equal(/robocopy[^\n]*['"]models['"]/.test(pack),false);
+  const pack=readFileSync('scripts/package-electron.mjs','utf8');
+  assert.ok(pack.includes("['agent','plugin','assets']"));
+  assert.ok(pack.includes("join(destination,'resources/runtime/models')"));
 });

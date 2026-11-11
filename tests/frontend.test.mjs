@@ -37,7 +37,7 @@ test('PekoPet keeps settings on demand and preserves dsh chat ownership',()=>{
 
 test('embedded overlay removes upstream branding and feedback without disabling model settings',t=>{
   const root=mkdtempSync(resolve('work/overlay-test-'));t.after(()=>rmSync(root,{recursive:true}));
-  const rows=prepareRuntime(root,{embedded:true}).rows;
+  const rows=prepareRuntime(root,{desktop:true}).rows;
   for(const id of ['ui-brand-official','ui-message-feedback','ui-settings-account','command-feedback'])assert.equal(rows.some(row=>row.id===id&&!row.disabled),false);
   for(const id of ['ui-settings-models','ui-model-selection','ui-approval','ui-user-questions'])assert.equal(rows.some(row=>row.id===id&&row.disabled),false);
 });
