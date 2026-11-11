@@ -42,17 +42,20 @@ export function validateCue(input:Cue,catalog:Catalog):Cue{
   cue.hold=Math.max(100,Math.min(60000,input.hold??2500));cue.clear=input.clear;return cue;
 }
 export class StreamCues {
-  attempt='';revision=0;next=0;parsers=new Map<number,CueParser>();
-  reset(){this.parsers.clear();this.attempt='';this.next=0;}
+  attempt='';revision=-1;next=0;parsers=new Map<number,CueParser>();
+  reset(){this.parsers.clear();this.attempt='';this.revision=-1;this.next=0;}
   accept(frame:any):Cue[]{
-    if(frame.type==='start'){if(frame.attemptId!==this.attempt||frame.revision!==this.revision){this.parsers.clear();this.attempt=frame.attemptId;this.revision=frame.revision;this.next=0;}return [];}
-    if(frame.attemptId!==this.attempt||frame.revision!==this.revision)return [];
+    // Revision increases on every frame; attemptId identifies a model attempt.
+    if(frame.revision<=this.revision)return [];
+    if(frame.type==='start'){this.parsers.clear();this.attempt=frame.attemptId;this.revision=frame.revision;this.next=0;return [];}
+    if(frame.attemptId!==this.attempt)return [];
+    this.revision=frame.revision;
     if(frame.type==='chunk'){
       if(frame.index<this.next)return [];if(frame.index!==this.next){this.parsers.clear();throw new Error('流式输出缺失，已停止角色控制');}this.next++;
       const chunk=frame.chunk;if(chunk.type!=='text-delta')return [];
       const parser=this.parsers.get(chunk.index)||new CueParser();this.parsers.set(chunk.index,parser);return parser.push(chunk.text);
     }
-    if(frame.type==='end'){const out=frame.outcome?.eventType==='assistant/attempt'||frame.outcome?.kind==='abandoned'?[]:[...this.parsers.values()].flatMap(p=>p.push('',true));this.parsers.clear();return out;}
+    if(frame.type==='end'){const out=frame.outcome?.eventType==='assistant/attempt'||frame.outcome?.kind==='abandoned'?[]:[...this.parsers.values()].flatMap(p=>p.push('',true));this.parsers.clear();this.attempt='';return out;}
     return [];
   }
 }

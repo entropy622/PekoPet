@@ -12,13 +12,13 @@ test('TypeScript cue parser preserves all chunk boundaries, Chinese names and qu
 test('code, incomplete markers, non-prose chunks, duplicate chunks and stale attempts do not animate',()=>{
   const parser=new CueParser();assert.deepEqual(parser.push('`[[peko:{"clear":true}]]`\n```json\n[[peko:{"clear":true}]]\n```'),[]);assert.deepEqual(new CueParser().push('[[peko:{',true),[]);
   const cursor=new StreamCues(),start={type:'start',attemptId:'a',revision:1};cursor.accept(start);
-  const chunk={type:'chunk',attemptId:'a',revision:1,index:0,chunk:{type:'text-delta',index:0,text:'[[peko:{"clear":true}]]'}};
+  const chunk={type:'chunk',attemptId:'a',revision:2,index:0,chunk:{type:'text-delta',index:0,text:'[[peko:{"clear":true}]]'}};
   assert.equal(cursor.accept(chunk).length,1);assert.equal(cursor.accept(chunk).length,0);assert.equal(cursor.accept({...chunk,attemptId:'b'}).length,0);
-  assert.deepEqual(cursor.accept({...chunk,index:1,chunk:{type:'reasoning-delta',text:'[[peko:{"clear":true}]]'}}),[]);
-  assert.throws(()=>cursor.accept({...chunk,index:3}),/缺失/);
-  cursor.accept({type:'start',attemptId:'b',revision:2});assert.deepEqual(cursor.accept(chunk),[]);
-  assert.equal(cursor.accept({...chunk,attemptId:'b',revision:2}).length,1);
-  assert.deepEqual(cursor.accept({type:'end',attemptId:'b',revision:2,outcome:{kind:'abandoned'}}),[]);
+  assert.deepEqual(cursor.accept({...chunk,revision:3,index:1,chunk:{type:'reasoning-delta',text:'[[peko:{"clear":true}]]'}}),[]);
+  assert.throws(()=>cursor.accept({...chunk,revision:4,index:3}),/缺失/);
+  cursor.accept({type:'start',attemptId:'b',revision:5});assert.deepEqual(cursor.accept(chunk),[]);
+  assert.equal(cursor.accept({...chunk,attemptId:'b',revision:6}).length,1);
+  assert.deepEqual(cursor.accept({type:'end',attemptId:'b',revision:7,outcome:{kind:'abandoned'}}),[]);
 });
 test('model catalog clamps ranges and rejects unknown controls and malformed values',()=>{
   const catalog={name:'test',expressions:['开心'],layers:['话筒'],motions:['wave'],parameters:[{id:'x',min:-1,max:1,default:0}]};
@@ -30,4 +30,12 @@ test('IPC JSON codec preserves bytes, undefined and user objects without reserve
   assert.deepEqual(decodeWire(JSON.parse(JSON.stringify(encodeWire(data)))),data);
   assert.deepEqual(decodePacket(JSON.parse(JSON.stringify(encodePacket(data)))),data);
   assert.throws(()=>decodePacket({version:2,payload:null}),/协议版本/);
+});
+
+test('real per-frame revision semantics dispatch a split marker immediately and deduplicate its replay',()=>{
+  const stream=new StreamCues();stream.accept({type:'start',attemptId:'root:1',revision:21});
+  const marker='[[peko:{"mix":{"开心":0.8},"hold":5000}]]',events=[];
+  for(let index=0;index<marker.length;index++){const frame={type:'chunk',attemptId:'root:1',revision:22+index,index,chunk:{type:'text-delta',index:0,text:marker[index]}};events.push(...stream.accept(frame));assert.deepEqual(stream.accept(frame),[]);}
+  assert.deepEqual(events,[{mix:{开心:.8},hold:5000}]);
+  assert.deepEqual(stream.accept({type:'end',attemptId:'root:1',revision:22+marker.length,outcome:{kind:'committed',eventType:'assistant/message'}}),[]);
 });
