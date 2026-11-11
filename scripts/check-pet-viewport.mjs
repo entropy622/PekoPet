@@ -71,7 +71,7 @@ try {
         for (const scale of [.25, .5, 1, 2]) {
             const old = await invoke('peko_state');
             const delta = -Math.log(scale / old.settings.petScale) / .001;
-            await pet.locator('canvas').dispatchEvent('wheel', { deltaY: delta, deltaMode: 0, clientX: 200 * old.settings.petScale, clientY: 300 * old.settings.petScale });
+            await pet.evaluate(({delta,scale,x,y})=>document.querySelector('canvas').dispatchEvent(new WheelEvent('wheel',{deltaY:delta,deltaMode:0,clientX:200*scale,clientY:300*scale,screenX:x+200*scale,screenY:y+300*scale,cancelable:true})),{delta,scale:old.settings.petScale,x:old.petWindow.x,y:old.petWindow.y});
             await waitSize(scale);
             const image = await frame();
             for (const edge of ['left', 'top', 'right', 'bottom'])
@@ -104,7 +104,7 @@ try {
     }
     await petInvoke('pet_action', { action: 'recover' });
     const before = await nativeBounds(), state = await invoke('peko_state');
-    await pet.locator('canvas').dispatchEvent('wheel', { deltaY: -Math.log(1.2 / state.settings.petScale) / .001, clientX: before.width * .3, clientY: before.height * .45 });
+    await pet.evaluate(({delta,x,y,left,top})=>document.querySelector('canvas').dispatchEvent(new WheelEvent('wheel',{deltaY:delta,clientX:x,clientY:y,screenX:left+x,screenY:top+y,cancelable:true})),{delta:-Math.log(1.2/state.settings.petScale)/.001,x:before.width*.3,y:before.height*.45,left:before.x,top:before.y});
     await waitSize(1.2);
     const after = await nativeBounds();
     assert.ok(Math.abs((before.x + before.width * .3) - (after.x + after.width * .3)) <= 1);

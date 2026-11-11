@@ -1,5 +1,5 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';
-import {constrainPet,petSize,zoomPet,restorePet,recoverPet} from '../desktop/pet-geometry.ts';
+import {constrainPet,petSize,zoomPet,restorePet,recoverPet,PetWheelZoom} from '../desktop/pet-geometry.ts';
 const area={x:0,y:0,width:1920,height:1080};
 const visible=(p,length,start,size)=>Math.max(0,Math.min(p+length,start+size)-Math.max(p,start))/length;
 test('75 percent off-screen is constrained independently on each axis, not by area',()=>{
@@ -24,4 +24,22 @@ test('old fixed-window settings keep the visual center; new settings restore wit
 });
 test('recover places the whole avatar in the work area',()=>{
   const value=recoverPet({x:-300,y:-450,width:400,height:600},4,area);assert.ok(value.x>=area.x&&value.y>=area.y);assert.ok(value.x+value.width<=area.width&&value.y+value.height<=area.height);
+});
+
+test('continuous wheel zoom retains its original screen anchor and returns without accumulated rounding',()=>{
+  const zoom=new PetWheelZoom(),origin={x:300,y:180,width:200,height:300},point={x:374,y:309};let rect=origin,scale=.5,time=0;
+  for(const delta of [...Array(96).fill(-3),...Array(96).fill(3)]){
+    const value=zoom.next(rect,scale,delta,area,point,time+=16);rect=value;scale=value.scale;
+    assert.ok(Math.abs(rect.x+rect.width*.37-point.x)<=.5);
+    assert.ok(Math.abs(rect.y+rect.height*.43-point.y)<=.5);
+  }
+  assert.deepEqual({x:rect.x,y:rect.y,width:rect.width,height:rect.height},origin);assert.ok(Math.abs(scale-.5)<1e-12);
+});
+
+test('wheel zoom restarts its anchor after moving, a pause or display change',()=>{
+  const zoom=new PetWheelZoom(),origin={x:300,y:180,width:200,height:300};
+  const first=zoom.next(origin,.5,-120,area,{x:374,y:309},0);
+  for(const [rect,screen,point,time] of [[{...first,x:first.x+30},area,{x:400,y:310},20],[first,area,{x:374,y:309},1000],[first,{...area,width:1600},{x:374,y:309},1100]]){
+    const value=zoom.next(rect,first.scale,80,screen,point,time),expected=zoomPet(rect,first.scale*Math.exp(-.08),screen,{x:(point.x-rect.x)/rect.width,y:(point.y-rect.y)/rect.height});assert.deepEqual(value,expected);
+  }
 });

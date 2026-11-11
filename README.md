@@ -114,9 +114,12 @@ npm run check:ui
 npm run check:avatar
 npm run check:exit
 npm run check:startup
+npm run check:zoom
 node scripts/smoke-agent.mjs
 npm run package:windows
 ```
+
+`check:zoom` 检查连续滚轮缩放的屏幕锚点、往返位置和透明合成帧；设置 `PEKO_ZOOM_DPI=1.5` 可覆盖非整数渲染 DPR。
 
 `check:startup` 在后台延迟初始化时检查桌宠与头像先行显示、启动前拖动保存及实际启动分段耗时。
 

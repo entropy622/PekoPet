@@ -1,6 +1,6 @@
 {
   "name": "pekopet",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "private": true,
   "type": "module",
   "engines": {
@@ -21,7 +21,8 @@
     "check:viewport": "node scripts/check-pet-viewport.mjs",
     "check:rendering": "node scripts/check-pet-rendering.mjs",
     "check:exit": "node scripts/check-exit.mjs",
-    "check:startup": "node scripts/check-startup.mjs"
+    "check:startup": "node scripts/check-startup.mjs",
+    "check:zoom": "node scripts/check-pet-zoom.mjs"
   },
   "dependencies": {
     "@deepseek-ai/cordis": "4.0.5",

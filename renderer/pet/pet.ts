@@ -108,7 +108,12 @@ async function start(){
   canvas.addEventListener('mousemove',event=>{hover={x:event.clientX,y:event.clientY};});
   canvas.addEventListener('mouseleave',()=>{hover=null;});
   canvas.addEventListener('contextmenu',event=>{event.preventDefault();void window.peko.invoke('pet_context_menu');});
-  canvas.addEventListener('wheel',event=>{event.preventDefault();const unit=event.deltaMode===1?16:event.deltaMode===2?innerHeight:1;void window.peko.invoke('pet_scale',{delta:event.deltaY*unit,anchorX:event.clientX/innerWidth,anchorY:event.clientY/innerHeight});},{passive:false});
+  let wheel:{delta:number;screenX:number;screenY:number}|undefined,wheelScheduled=false,wheelInFlight=false;
+  const scheduleWheel=()=>{if(wheelScheduled)return;wheelScheduled=true;requestAnimationFrame(()=>{
+    wheelScheduled=false;if(wheelInFlight||!wheel)return;const request=wheel;wheel=undefined;wheelInFlight=true;
+    void window.peko.invoke('pet_scale',request).catch(failure).finally(()=>{wheelInFlight=false;if(wheel)scheduleWheel();});
+  });};
+  canvas.addEventListener('wheel',event=>{event.preventDefault();const unit=event.deltaMode===1?16:event.deltaMode===2?innerHeight:1;wheel={delta:(wheel?.delta||0)+event.deltaY*unit,screenX:event.screenX,screenY:event.screenY};scheduleWheel();},{passive:false});
   const hitPixels=new Uint8Array(3*3*4);
   const hitTest=()=>{
     let hit=false;

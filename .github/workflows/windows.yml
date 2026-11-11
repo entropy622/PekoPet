@@ -53,6 +53,7 @@ jobs:
       - run: npm run check:ui
       - run: npm run check:exit
       - run: npm run check:startup
+      - run: npm run check:zoom
       - name: Build portable candidate
         if: github.repository == 'entropy622/PekoPet' && github.event_name != 'pull_request'
         run: npm run package:windows -- --destination dist/PekoPet-windows-x64
@@ -70,6 +71,8 @@ jobs:
           npm run check:exit
           $env:PEKO_UI_OUT=Join-Path $pwd 'work/startup-portable-checks'
           npm run check:startup
+          $env:PEKO_UI_OUT=Join-Path $pwd 'work/zoom-portable-checks'
+          npm run check:zoom
       - uses: actions/upload-artifact@v4
         if: github.repository == 'entropy622/PekoPet' && github.event_name != 'pull_request'
         with:

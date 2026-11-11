@@ -15,6 +15,18 @@ export function zoomPet(rect:Rect,scale:number,screen:Rect,anchor:Anchor={x:.5,y
   const size=petSize(scale,screen),x=clamp(anchor.x,0,1),y=clamp(anchor.y,0,1);
   return {...constrainPet({x:rect.x+rect.width*x-size.width*x,y:rect.y+rect.height*y-size.height*y,width:size.width,height:size.height},screen),scale:size.scale};
 }
+/** Keep a wheel gesture anchored to its original screen point, without rounding drift. */
+export class PetWheelZoom {
+  private gesture?:{origin:Rect;anchor:Anchor;point:Anchor;screen:Rect;last:Rect;scale:number;time:number};
+  next(rect:Rect,scale:number,delta:number,screen:Rect,point:Anchor,time:number){
+    let g=this.gesture;
+    if(!g||time-g.time>350||Math.abs(point.x-g.point.x)>2||Math.abs(point.y-g.point.y)>2||scale!==g.scale||(['x','y','width','height'] as const).some(key=>Math.abs(rect[key]-g!.last[key])>1||screen[key]!==g!.screen[key])){
+      g={origin:{...rect},anchor:{x:(point.x-rect.x)/rect.width,y:(point.y-rect.y)/rect.height},point:{...point},screen:{...screen},last:rect,scale,time};
+    }
+    const value=zoomPet(g.origin,scale*Math.exp(-delta*.001),screen,g.anchor);
+    g.last=value;g.scale=value.scale;g.time=time;this.gesture=g;return value;
+  }
+}
 export function restorePet(settings:{petX?:number;petY?:number;petScale?:number;petWidth?:number;petHeight?:number},screen:Rect){
   const size=petSize(settings.petScale??1,screen);
   const dx=(settings.petWidth??size.width)-size.width,dy=(settings.petHeight??size.height)-size.height;

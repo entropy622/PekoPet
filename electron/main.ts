@@ -6,7 +6,7 @@ import {Runtime} from '../desktop/runtime.ts';
 import {modelDescriptor,modelFile,confinedFile} from '../desktop/model-library.ts';
 import {StreamCues,validateCue,type Catalog,type Cue} from '../desktop/cues.ts';
 import {readModelLocations,setModelLocation} from '../plugin/model-locations.ts';
-import {constrainPet,petSize,zoomPet,restorePet,recoverPet} from '../desktop/pet-geometry.ts';
+import {constrainPet,petSize,zoomPet,restorePet,recoverPet,PetWheelZoom} from '../desktop/pet-geometry.ts';
 import {renderIndex} from '../desktop/render-index.ts';
 import {portraitIcon} from '../desktop/portrait-icon.ts';
 
@@ -28,6 +28,7 @@ const onDisplayChange=()=>{if(!quitting)applyWindowSettings();};
 const streams=new StreamCues();
 let petHit=false,petDragging=false,petIgnoring:boolean|undefined;
 let pendingGeometry:Record<string,unknown>|undefined;
+const wheelZoom=new PetWheelZoom();
 function startupStage(name:string){if(state.startup[name]!==undefined)return;state.startup[name]=Date.now()-startedAt;console.info('[PekoPet startup]',name,state.startup[name]+' ms');}
 const geometryKeys=['petX','petY','petWidth','petHeight','petScale','petMonitor','petDpi'] as const;
 function geometryPatch(){return Object.fromEntries(geometryKeys.filter(key=>state.settings[key]!==undefined).map(key=>[key,state.settings[key]]));}
@@ -151,6 +152,10 @@ ipcMain.handle('peko:invoke',async(event,command:string,args:any={})=>{
   }
   if(command==='pet_scale'&&isPet){
     if(!Number.isFinite(args.delta))throw new Error('缩放距离须为有效数值');
+    if(Number.isFinite(args.screenX)&&Number.isFinite(args.screenY)){
+      const bounds=pet.getBounds(),display=screen.getDisplayMatching(bounds);
+      placePet(wheelZoom.next(bounds,state.settings.petScale||1,args.delta,display.bounds,{x:args.screenX,y:args.screenY},performance.now()));return;
+    }
     const anchor={x:Number.isFinite(args.anchorX)?args.anchorX:.5,y:Number.isFinite(args.anchorY)?args.anchorY:1};resizePet((state.settings.petScale||1)*Math.exp(-args.delta*.001),anchor);return;
   }
   if(isPet)throw new Error('桌宠无权访问此操作');
