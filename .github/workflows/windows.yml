@@ -51,6 +51,7 @@ jobs:
       - name: Cache default evaluation model for hidden Electron checks
         run: npm run assets
       - run: npm run check:ui
+      - run: npm run check:exit
       - name: Build portable candidate
         if: github.repository == 'entropy622/PekoPet' && github.event_name != 'pull_request'
         run: npm run package:windows -- --destination dist/PekoPet-windows-x64
@@ -64,6 +65,8 @@ jobs:
           $env:PEKO_UI_ROOT=Join-Path $portable 'resources/runtime'
           $env:PEKO_UI_OUT=Join-Path $pwd 'work/electron-portable-checks'
           npm run check:ui
+          $env:PEKO_UI_OUT=Join-Path $pwd 'work/exit-portable-checks'
+          npm run check:exit
       - uses: actions/upload-artifact@v4
         if: github.repository == 'entropy622/PekoPet' && github.event_name != 'pull_request'
         with:

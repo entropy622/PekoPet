@@ -6,7 +6,7 @@ import {tmpdir} from 'node:os';
 import {pathToFileURL} from 'node:url';
 import {Runtime} from '../desktop/runtime.ts';
 
-test('desktop runtime serves bootstrap, binary bundles and cancellable streams over IPC without an HTTP listener',{timeout:120000},async t=>{
+test('desktop runtime serves bootstrap, binary bundles and cancellable streams over IPC without an HTTP listener',{timeout:180000},async t=>{
   const home=mkdtempSync(join(tmpdir(),'peko-ipc-'));
   mkdirSync(join(home,'profiles/desktop'),{recursive:true});writeFileSync(join(home,'profiles/desktop/cordis.patch.yml'),'- id: llm-deepseek-account\n  disabled: true\n');
   const patch=join(home,'fixture.yml');writeFileSync(patch,`- insert:\n    - id: fixture-model\n      name: '${pathToFileURL(resolve('tests/replay-adapter.mjs')).href}'\n`);

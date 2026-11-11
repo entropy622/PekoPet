@@ -113,9 +113,12 @@ npm run typecheck
 npm run build
 npm run check:ui
 npm run check:avatar
+npm run check:exit
 node scripts/smoke-agent.mjs
 npm run package:windows
 ```
+
+`check:exit` 启用真实注视轮询，并延迟后台关闭，检查三种退出路径且记录主进程异常。
 
 `check:avatar` 需要本机已安装三款测试角色，逐个播放动作并检查 WebGL 恢复；不运行长稳。离屏检查使用真实隐藏 Electron 窗口、隔离 DSH_HOME、持久测试 userData、脚本模型和临时项目，不移动系统鼠标、不抢焦点、不注册托盘或全局快捷键。覆盖连续启动、重启、配置重载、原始聊天组件、工具、审批、提问、停止、记忆、历史和真实 WebGL 模型。截图及报告保存在忽略的 `work/electron-checks`。
 
