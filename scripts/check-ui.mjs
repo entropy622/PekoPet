@@ -54,6 +54,13 @@ try{
   await tab(page,'角色调试');
   const avatarPicker=page.getByRole('combobox',{name:'角色',exact:true});
   assert.equal(await avatarPicker.locator('option[value=deepseek]').textContent(),'DeepSeek-chan（大肥鱼）');
+  assert.equal(await avatarPicker.locator('option[value="strawberry-rabbit"]').textContent(),'草莓兔兔 DLC');
+  if(existsSync(join(runtimeRoot,'models/strawberry-rabbit/草莓兔兔1/草莓兔兔.model3.json'))){
+    await avatarPicker.selectOption('strawberry-rabbit');await until(async()=>(await invoke('peko_state')).settings.avatar==='strawberry-rabbit');
+    await snap(page,'strawberry-character-selection');
+    await avatarPicker.selectOption('yumi');await until(async()=>(await invoke('peko_state')).settings.avatar==='yumi');
+    checks.push('private-library strawberry rabbit is selectable and persists through native settings RPC');
+  }
   if(existsSync(join(runtimeRoot,'local/models/deepseek/DeepSeek/大肥鱼.model3.json'))){
     await avatarPicker.selectOption('deepseek');await until(async()=>(await invoke('peko_state')).settings.avatar==='deepseek');
     await snap(page,'deepseek-character-selection');

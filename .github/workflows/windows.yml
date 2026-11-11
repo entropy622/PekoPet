@@ -24,9 +24,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: false
           ref: ${{ inputs.for-release && 'main' || github.sha }}
           fetch-depth: 0
+      - name: Fetch public Cubism Framework only
+        run: git submodule update --init --recursive vendor/cubism-framework
       - uses: actions/setup-node@v4
         with:
           node-version: '24'

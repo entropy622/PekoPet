@@ -1,3 +1,6 @@
 [submodule "vendor/cubism-framework"]
 	path = vendor/cubism-framework
 	url = https://github.com/Live2D/CubismNativeFramework.git
+[submodule "models"]
+	path = models
+	url = https://github.com/entropy622/Live2DModels.git

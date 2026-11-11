@@ -6,33 +6,46 @@
       "author": "Erara_艾拉拉",
       "model": "yumi/yumi.model3.json",
       "layers": ["拿话筒", "抬手右", "抬手左", "俯身按键", "漂浮小狗", "眼罩"],
-      "excluded": ["短发1", "短发2"]
+      "excluded": ["短发1", "短发2"],
+      "library": "yumi/yumi.model3.json"
     },
     "bingtang": {
       "name": "冰糖",
       "author": "神宫凉子",
       "model": "免费模型冰糖/免费模型冰糖.model3.json",
       "layers": [],
-      "excluded": ["shuiyin1", "shuiyin2", "danhair", "danhairL", "HAIR11", "HAIR2", "HAIR22", "HAIR3", "HAIR33", "hairR1", "Rhair"]
+      "excluded": ["shuiyin1", "shuiyin2", "danhair", "danhairL", "HAIR11", "HAIR2", "HAIR22", "HAIR3", "HAIR33", "hairR1", "Rhair"],
+      "library": "bingtang/免费模型冰糖/免费模型冰糖.model3.json"
     },
     "deepseek": {
       "name": "DeepSeek-chan（大肥鱼）",
       "author": "原画及拆分：神宫凉子；Live2D 建模：霓虹猫_NeonNeko",
       "source": "local",
       "model": "deepseek/DeepSeek/大肥鱼.model3.json",
-      "tracking": {"x":"AngleX","y":"AngleY"},
-      "portrait": {"scale":5.0,"y":-2.95},
+      "tracking": {"x": "AngleX", "y": "AngleY"},
+      "portrait": {"scale": 5.0, "y": -2.95},
       "parameters": ["AngleX", "AngleY", "AngleZ", "PositionX", "PositionY", "PositionZ", "LeanInput"],
       "excludedParameters": ["ParamAngleX", "ParamAngleY", "ParamAngleZ", "ParamBodyAngleX", "ParamBodyAngleY", "ParamBodyAngleZ"],
       "layers": ["单片眼镜", "钢盆", "黑框眼镜", "前倾", "竖食指开", "兔牙", "尾巴开关"],
-      "excluded": ["默认体型", "体型1", "体型2", "裙子切换", "脱鞋", "胸口衣服", "竖食指关"]
+      "excluded": ["默认体型", "体型1", "体型2", "裙子切换", "脱鞋", "胸口衣服", "竖食指关"],
+      "library": "deepseek/DeepSeek/大肥鱼.model3.json"
     },
     "ellen": {
       "name": "艾莲",
       "author": "神宫凉子 / 杨小唸",
       "model": "免费模型艾莲/免费模型艾莲.model3.json",
       "layers": [],
-      "excluded": ["shuiyin"]
+      "excluded": ["shuiyin"],
+      "library": "ellen/免费模型艾莲/免费模型艾莲.model3.json"
+    },
+    "strawberry-rabbit": {
+      "name": "草莓兔兔 DLC",
+      "author": "立绘：赛博撸猫人；建模：糖糖锦鲤",
+      "source": "library",
+      "model": "strawberry-rabbit/草莓兔兔1/草莓兔兔.model3.json",
+      "portrait": {"scale": 5.5, "y": -3.35},
+      "layers": ["右抬手", "左抬手", "打游戏", "比心", "话筒"],
+      "excluded": ["水印", "双马尾", "上", "下", "左", "右", "加"]
     }
   }
 }

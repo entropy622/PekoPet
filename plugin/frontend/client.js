@@ -49,14 +49,16 @@ var avatars_default = {
       author: "Erara_\u827E\u62C9\u62C9",
       model: "yumi/yumi.model3.json",
       layers: ["\u62FF\u8BDD\u7B52", "\u62AC\u624B\u53F3", "\u62AC\u624B\u5DE6", "\u4FEF\u8EAB\u6309\u952E", "\u6F02\u6D6E\u5C0F\u72D7", "\u773C\u7F69"],
-      excluded: ["\u77ED\u53D11", "\u77ED\u53D12"]
+      excluded: ["\u77ED\u53D11", "\u77ED\u53D12"],
+      library: "yumi/yumi.model3.json"
     },
     bingtang: {
       name: "\u51B0\u7CD6",
       author: "\u795E\u5BAB\u51C9\u5B50",
       model: "\u514D\u8D39\u6A21\u578B\u51B0\u7CD6/\u514D\u8D39\u6A21\u578B\u51B0\u7CD6.model3.json",
       layers: [],
-      excluded: ["shuiyin1", "shuiyin2", "danhair", "danhairL", "HAIR11", "HAIR2", "HAIR22", "HAIR3", "HAIR33", "hairR1", "Rhair"]
+      excluded: ["shuiyin1", "shuiyin2", "danhair", "danhairL", "HAIR11", "HAIR2", "HAIR22", "HAIR3", "HAIR33", "hairR1", "Rhair"],
+      library: "bingtang/\u514D\u8D39\u6A21\u578B\u51B0\u7CD6/\u514D\u8D39\u6A21\u578B\u51B0\u7CD6.model3.json"
     },
     deepseek: {
       name: "DeepSeek-chan\uFF08\u5927\u80A5\u9C7C\uFF09",
@@ -68,14 +70,25 @@ var avatars_default = {
       parameters: ["AngleX", "AngleY", "AngleZ", "PositionX", "PositionY", "PositionZ", "LeanInput"],
       excludedParameters: ["ParamAngleX", "ParamAngleY", "ParamAngleZ", "ParamBodyAngleX", "ParamBodyAngleY", "ParamBodyAngleZ"],
       layers: ["\u5355\u7247\u773C\u955C", "\u94A2\u76C6", "\u9ED1\u6846\u773C\u955C", "\u524D\u503E", "\u7AD6\u98DF\u6307\u5F00", "\u5154\u7259", "\u5C3E\u5DF4\u5F00\u5173"],
-      excluded: ["\u9ED8\u8BA4\u4F53\u578B", "\u4F53\u578B1", "\u4F53\u578B2", "\u88D9\u5B50\u5207\u6362", "\u8131\u978B", "\u80F8\u53E3\u8863\u670D", "\u7AD6\u98DF\u6307\u5173"]
+      excluded: ["\u9ED8\u8BA4\u4F53\u578B", "\u4F53\u578B1", "\u4F53\u578B2", "\u88D9\u5B50\u5207\u6362", "\u8131\u978B", "\u80F8\u53E3\u8863\u670D", "\u7AD6\u98DF\u6307\u5173"],
+      library: "deepseek/DeepSeek/\u5927\u80A5\u9C7C.model3.json"
     },
     ellen: {
       name: "\u827E\u83B2",
       author: "\u795E\u5BAB\u51C9\u5B50 / \u6768\u5C0F\u5538",
       model: "\u514D\u8D39\u6A21\u578B\u827E\u83B2/\u514D\u8D39\u6A21\u578B\u827E\u83B2.model3.json",
       layers: [],
-      excluded: ["shuiyin"]
+      excluded: ["shuiyin"],
+      library: "ellen/\u514D\u8D39\u6A21\u578B\u827E\u83B2/\u514D\u8D39\u6A21\u578B\u827E\u83B2.model3.json"
+    },
+    "strawberry-rabbit": {
+      name: "\u8349\u8393\u5154\u5154 DLC",
+      author: "\u7ACB\u7ED8\uFF1A\u8D5B\u535A\u64B8\u732B\u4EBA\uFF1B\u5EFA\u6A21\uFF1A\u7CD6\u7CD6\u9526\u9CA4",
+      source: "library",
+      model: "strawberry-rabbit/\u8349\u8393\u5154\u51541/\u8349\u8393\u5154\u5154.model3.json",
+      portrait: { scale: 5.5, y: -3.35 },
+      layers: ["\u53F3\u62AC\u624B", "\u5DE6\u62AC\u624B", "\u6253\u6E38\u620F", "\u6BD4\u5FC3", "\u8BDD\u7B52"],
+      excluded: ["\u6C34\u5370", "\u53CC\u9A6C\u5C3E", "\u4E0A", "\u4E0B", "\u5DE6", "\u53F3", "\u52A0"]
     }
   }
 };

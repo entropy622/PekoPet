@@ -16,6 +16,12 @@ PekoPet-authored code is MIT. The repository MIT license does not relicense thes
 
 Yumi is by Erara_艾拉拉. Ice Sugar and Ellen assets retain their creators' restrictions from the original LLM_Live2D repository. The asset setup script caches these models for local evaluation. They are not committed or included in the portable package. Portrait PNG/ICO files generated from them remain in the same local cache with attribution. A local build can use its cached Yumi icon; public CI uses the PekoPet-authored fallback icon.
 
+## Private Live2D asset library
+
+The optional `models` submodule references the private entropy622/Live2DModels repository. It stores the owner's personal copies of the fixed characters and their original notices, with binary assets in Git LFS. The public source contains only a gitlink, integration metadata and code. Public CI does not fetch this submodule; portable packages and archives exclude its assets. Shared private storage grants no additional model rights. Keep access restricted to the owner and follow each original notice for every consuming project.
+
+Strawberry Rabbit DLC（草莓兔兔）: illustration by 赛博撸猫人; Live2D modeling by 糖糖锦鲤. Imported from the user-supplied 草莓兔兔-DLC+(2).zip with the original 草莓猫猫兔使用说明.txt retained. The notice requests no reuploading. Its watermark, hairstyle and game-button expressions are excluded from semantic emotion control. Runtime expressions and motions are discovered from the original files without rewriting them. Derived portraits remain in the local cache and are excluded from public distribution.
+
 The Cubism Core importer retains its license and redistribution list. The official SDK download requires accepting Live2D's license agreements. Model-import expansion and public binary distribution require a release-license review separate from source-code development.
 
 ## DeepSeek-chan local model

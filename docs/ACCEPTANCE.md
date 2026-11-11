@@ -1,5 +1,14 @@
 # PekoPet 验收记录
 
+## 草莓兔兔与私有模型库 · 2026-11-11
+
+- 新建 entropy622/Live2DModels 私有仓库，PekoPet 的 models submodule 固定引用其提交。收录用户提供的草莓兔兔 DLC 原始运行文件，以及现有 DeepSeek-chan、Yumi、冰糖和艾莲；原目录、中文文件名和作者说明保留，纹理与 moc3 使用 Git LFS。私有库自身提供通用 catalog.json、来源清单和验证入口，其他个人项目可直接作为 submodule 使用。
+- 草莓兔兔立绘为赛博撸猫人，建模为糖糖锦鲤。原使用说明要求不要二传，资源限所有者已获授权的个人用途。公开源码只含 gitlink 与集成代码，公开 CI 仅初始化 Cubism Framework；归档用例验证 models 内的私有文件不进入 ZIP，打包目录的复制清单也不包含模型库。
+- 角色目录支持草莓兔兔 DLC，13 种情绪、5 个持续手势／道具层和 4 个原始动作。水印、双马尾和游戏按键独立于语义控制；保留原物理、眨眼、呼吸和鼠标注视。已有角色优先使用私有库，原缓存和 DeepSeek 本机导入仍可使用。
+- 私有库验证入口检查 5 个模型的 59 个文件引用与实际 moc3 文件，全部通过。本机 release 编译通过，Node 全量 39 项用例通过，补充缓存中断后修复回归通过；覆盖中文资源路径、私有库缺失提示、旧路径兼容、资源优先级和公开 CI 范围。
+- 原生离屏检查记录草莓兔兔的 297 个参数、551 个绘制对象和 35 组裁切蒙版，26 张画面覆盖中性、各情绪／手势、混合、回落、注视和全部动作。实际检查星星眼、比心及注视画面，保留作者水印。报告在 work/strawberry-native/report.json；生成画面不入库。
+- 实际 Tauri/WebView2 与无头 WebKit 离屏界面检查通过，22 张截图包含新角色选择与原生设置 RPC 持久化，浏览器异常为零。原生头像使用独立大头裁切，输出至本机 icons 缓存。
+
 ## PekoPet 自有 AgentRuntime · 2026-11-10
 
 - Rust 直接启动 scripts/start-agent.mjs；移除 dsh CLI、managed peko profile 和 SDK server 插件启动链。根会话与子会话共用 vendor/peko-agent-loop/src 的本地驱动，能力接口返回 PekoPet 所有权；安装依赖中已无 dsh CLI。

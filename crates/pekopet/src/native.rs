@@ -536,6 +536,12 @@ pub fn model_path(id: &str) -> PathBuf {
     let relative = metadata["avatars"][id]["model"]
         .as_str()
         .expect("Known avatar id");
+    let library = crate::root().join("models").join(
+        metadata["avatars"][id]["library"].as_str().unwrap_or(relative),
+    );
+    if metadata["avatars"][id]["source"] == "library" || library.exists() {
+        return library;
+    }
     if metadata["avatars"][id]["source"] == "local" {
         crate::root().join("local/models").join(relative)
     } else {

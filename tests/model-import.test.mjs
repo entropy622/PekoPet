@@ -33,12 +33,12 @@ test('missing resources and escaping references are rejected before import',t=>{
 
 test('local character selection requires its import and preserves existing character settings',async t=>{
   const f=fixture(t);mkdirSync(join(f.target,'plugin'),{recursive:true});mkdirSync(join(f.target,'assets'));
-  copyFileSync('plugin/state.mjs',join(f.target,'plugin/state.mjs'));copyFileSync('assets/avatars.json',join(f.target,'assets/avatars.json'));
+  for(const file of ['state.mjs','model-path.mjs'])copyFileSync('plugin/'+file,join(f.target,'plugin',file));copyFileSync('assets/avatars.json',join(f.target,'assets/avatars.json'));
   const {State}=await import(pathToFileURL(join(f.target,'plugin/state.mjs')).href);
   const state=new State(join(f.target,'state.sqlite3'));
   try{
     assert.equal(state.updateSettings({avatar:'yumi'}).avatar,'yumi');
-    assert.throws(()=>state.updateSettings({avatar:'deepseek'}),/请先导入/);
+    assert.throws(()=>state.updateSettings({avatar:'deepseek'}),/资源未安装/);
     assert.equal(state.settings().avatar,'yumi');
     importDeepseek(f.source,f.target);
     assert.equal(state.updateSettings({avatar:'deepseek'}).avatar,'deepseek');

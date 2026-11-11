@@ -9,8 +9,9 @@
 需要 Rust stable MSVC、Node.js 24，以及独立的 Visual Studio Build Tools C++ 工作负载（MSVC v143、Windows SDK，含 fxc）。无需完整 VS IDE。参考 Microsoft 的 [开源开发 Build Tools 许可说明](https://devblogs.microsoft.com/cppblog/updates-to-visual-studio-build-tools-license-for-c-and-cpp-open-source-projects/)。
 
 ```powershell
-git clone --recurse-submodules https://github.com/entropy622/PekoPet.git
+git clone https://github.com/entropy622/PekoPet.git
 cd PekoPet
+git submodule update --init --recursive vendor/cubism-framework
 npm ci
 ```
 
@@ -24,7 +25,24 @@ npm run assets
 npm run dev
 ```
 
-已有 clone 可运行 `git submodule update --init --recursive` 补齐 Framework。使用其他已有角色时运行 `npm run assets -- --all`。模型存入本机 DSH_HOME 下的缓存，保留原作者署名和使用说明。
+已有 clone 可运行 `git submodule update --init --recursive vendor/cubism-framework` 补齐公开 Framework。使用其他已有角色时运行 `npm run assets -- --all`。模型缓存保留原作者署名和使用说明。已获取私有库中的对应角色时，启动脚本直接使用私有资源，不再下载缓存副本。
+
+### 私有 Live2D 资源库
+
+`models` 是 [entropy622/Live2DModels](https://github.com/entropy622/Live2DModels) 私有仓库的 submodule。它独立于 PekoPet，其他个人项目可直接将同一仓库作为 submodule 使用。资源清单在库内的 `catalog.json`，保留原模型目录、文件名和作者说明，二进制使用 Git LFS。
+
+有仓库访问权的电脑运行：
+
+```powershell
+git lfs install
+git submodule update --init models
+git -C models lfs pull
+node models/scripts/validate.mjs
+```
+
+当前收录草莓兔兔 DLC、DeepSeek-chan、Yumi、冰糖和艾莲。PekoPet 优先使用私有库资源，原缓存与本机导入路径保持可用。草莓兔兔在“更多选项 → 角色调试 → 角色”中选择 **草莓兔兔 DLC**，退出托盘后重新启动生效。支持 13 种情绪表情、5 个持续手势／道具层和 4 个原始动作；水印、发型与游戏按键不会作为语义表情暴露。
+
+立绘：赛博撸猫人；建模：糖糖锦鲤。原说明要求不要二传。模型限已获授权的个人用途，私有库存储不扩大使用授权。公开仓库只记录 submodule 地址与固定版本；CI 只拉取公开 Framework，公开便携目录及 ZIP 均排除私有模型。无私有库访问权也可正常构建，并通过原缓存使用默认角色。
 
 ### 本机 DeepSeek-chan 模型
 
@@ -36,7 +54,7 @@ node scripts/import-deepseek.mjs "C:/Users/你的用户名/Downloads/DeepSeek免
 
 导入后，在“更多选项 → 角色调试 → 角色”选择 **DeepSeek-chan（大肥鱼）**，退出托盘后重新启动。角色外观与人格分别设置。
 
-模型保存于项目的 `local/models/deepseek`，保留 DeepSeek 原目录、文件名和使用须知，不复制 PSD。原画及拆分：神宫凉子；Live2D 建模：霓虹猫_NeonNeko。附带须知禁止重新分发完整模型，因此这些资源不会提交到公开仓库，也不随便携包发布。换电脑后需自行取得原包并再次导入。
+手动导入保存于项目的 `local/models/deepseek`，保留 DeepSeek 原目录、文件名和使用须知，不复制 PSD。也可使用上述私有资源库。原画及拆分：神宫凉子；Live2D 建模：霓虹猫_NeonNeko。附带须知禁止重新分发完整模型，这些资源不进入公开仓库或便携包。换电脑后可在本人授权范围内拉取私有 submodule，或自行取得原包再次导入。
 
 模型开发时可用原生离屏检查入口，不显示桌宠或托盘，也不连接模型提供方：
 

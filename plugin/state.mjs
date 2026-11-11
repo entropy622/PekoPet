@@ -1,7 +1,8 @@
 import { DatabaseSync } from 'node:sqlite';
-import { mkdirSync, readFileSync, existsSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import {requireModel} from './model-path.mjs';
 const avatars=JSON.parse(readFileSync(new URL('../assets/avatars.json',import.meta.url),'utf8')).avatars;
 
 export const defaultSettings = {
@@ -45,7 +46,7 @@ export class State {
     }
     if (next.persona.length > 12000 || next.idleMinutes < 1 || next.idleMinutes > 1440 || next.activeStart < 0 || next.activeEnd > 24 || next.activeStart >= next.activeEnd || next.maxDailyGreetings < 0 || next.maxDailyGreetings > 20 || next.petScale < 0.1 || next.petScale > 4) throw new Error('设置超出范围');
     if(!Object.hasOwn(avatars,next.avatar))throw new Error('角色必须选自固定目录');
-    if(patch.avatar&&avatars[next.avatar].source==='local'&&!existsSync(new URL('../local/models/'+avatars[next.avatar].model,import.meta.url)))throw new Error('请先导入本机模型：node scripts/import-deepseek.mjs "模型压缩包解压目录"');
+    if(patch.avatar&&['local','library'].includes(avatars[next.avatar].source))requireModel(next.avatar);
     this.db.prepare('INSERT OR REPLACE INTO settings VALUES(1,?)').run(JSON.stringify(next)); return next;
   }
   memories() { return this.db.prepare('SELECT id,text,source_session AS sourceSession,source_seq AS sourceSeq,created FROM memories ORDER BY created').all(); }
