@@ -35,6 +35,7 @@ try{
   browser=await chromium.connectOverCDP(`http://127.0.0.1:${port}`);page=browser.contexts()[0].pages()[0];
   page.on('pageerror',e=>consoleErrors.push(String(e)));page.on('console',m=>{if(m.type()==='error'&&!(reconnecting&&(m.text().includes('WebSocket')||m.text().includes('ERR_CONNECTION_REFUSED'))))consoleErrors.push(m.text());});
   await page.waitForSelector('[data-peko-ready]',{timeout:180000});
+  assert.equal(await page.locator('script[src*="dsh-client-modules/client.js"]').count(),0,'Module bootstrap must be in the HTML');
   await page.locator('[contenteditable=true]').first().waitFor({state:'visible'});await until(async()=>(await page.title()).endsWith('PekoPet'));assert.equal((await page.title()).includes('DeepSeek Harness'),false);assert.equal(await page.getByText('预览版说明',{exact:true}).count(),0);
   const bootPackages=await page.evaluate(()=>window.__DSH_BOOT__.entries.map(entry=>entry.id));
   for(const id of ['@deepseek-ai/dsh-client-ui-brand-official','@deepseek-ai/dsh-client-ui-message-feedback','@deepseek-ai/dsh-client-ui-settings-account'])assert.equal(bootPackages.includes(id),false,'Unexpected product UI: '+id);
@@ -98,10 +99,14 @@ try{
   await send('questions');await page.getByText('绿色',{exact:true}).click();await page.getByPlaceholder('输入你的答案',{exact:true}).fill('离屏回答');await snap(page,'dsh-questions');await page.getByRole('button',{name:'提交',exact:true}).click();await until(async()=>!(await invoke('peko_state')).busy);checks.push('original dsh multi-question choice and free text answers');
   await send('cancel');const stop=page.getByRole('button',{name:'停止生成',exact:true});await stop.waitFor();await page.locator('[data-chat-running]').waitFor();assert.equal(await page.locator('[data-chat-running] svg').evaluateAll(nodes=>nodes.every(n=>n.getBoundingClientRect().width<=32)),true,'Running indicator dimensions');await snap(page,'dsh-running');await stop.click();await until(async()=>!(await invoke('peko_state')).busy);await stop.waitFor({state:'hidden'});assert.equal((await page.locator('#root').innerText()).includes('[[peko:'),false);assert.equal((await invoke('peko_state')).error,'');checks.push('original dsh stop cancels streaming; interrupted markers remain hidden');
   await page.evaluate(async()=>{await window.__TAURI__.event.listen('peko-external-link',event=>{window.__pekoExternalLink=event.payload;});window.open('https://example.com/peko-link-test','_blank','noopener,noreferrer');});await until(async()=>await page.evaluate(()=>window.__pekoExternalLink==='https://example.com/peko-link-test'));checks.push('HTTP links dispatch to the native system-browser path; test mode launches no external browser');
-  const url=caps.frontendUrl;other=await webkit.launch({headless:true});const wk=await other.newPage({viewport:{width:720,height:760}});
+  const url=caps.frontendUrl;
+  const unauthorized=await fetch(new URL('/',url));assert.equal(unauthorized.status,401);assert.equal(unauthorized.headers.get('cache-control'),'no-store');
+  other=await webkit.launch({headless:true});const wk=await other.newPage({viewport:{width:720,height:760}});
   await wk.exposeFunction('__pekoInvoke',(command,args)=>command==='peko_activate'?Promise.resolve():invoke(command,args));
   await wk.addInitScript(()=>{window.__TAURI__={core:{invoke:(command,args)=>window.__pekoInvoke(command,args)},event:{listen:async()=>()=>{}}};});
-  await wk.goto(url);await wk.waitForSelector('[data-peko-ready]',{timeout:60000});await until(async()=>(await wk.title()).endsWith('PekoPet'));assert.equal((await wk.title()).includes('DeepSeek Harness'),false);assert.equal(await wk.getByText('预览版说明',{exact:true}).count(),0);
+  await wk.route('**/plugins/**',route=>route.request().url().includes('dsh-client-modules/client.js')?route.abort():route.continue());
+  const indexResponse=await wk.goto(url);assert.equal(indexResponse.headers()['cache-control'],'no-store');await wk.waitForSelector('[data-peko-ready]',{timeout:60000});await until(async()=>(await wk.title()).endsWith('PekoPet'));assert.equal((await wk.title()).includes('DeepSeek Harness'),false);assert.equal(await wk.getByText('预览版说明',{exact:true}).count(),0);
+  await wk.reload();await wk.waitForSelector('[data-peko-ready]',{timeout:60000});checks.push('inline module bootstrap survives blocked external bootstrap requests and reload; HTML is no-store');
   await snap(wk,'webkit-chat');await tab(wk,'相处方式');await wk.getByRole('textbox',{name:'人格',exact:true}).waitFor();await snap(wk,'webkit-persona');checks.push('WebKit renders the same frontend and navigates React panes, using the test native bridge');
   assert.deepEqual(consoleErrors.filter(e=>!e.includes('503')),[], 'Browser errors');
   await other.close();other=null;

@@ -1,5 +1,12 @@
 # PekoPet 验收记录
 
+## 启动模块预加载修复 · 2026-11-11
+
+- 用户报告入口显示 Failed to load plugins / HTML did not preload @deepseek-ai/dsh-client-modules/client.js。PekoPet 通过结构化 index injection 将固定版本的核心模块加载器放入 HTML，保持注册队列、核心注册、图清单和应用 shell 的执行顺序；其余应用包继续走原有 revision URL，聊天渲染仍由原 React 组件负责。
+- 入口 / 与 /index.html 沿用 Connection 的授权流程，响应设置 Cache-Control: no-store；无凭据访问返回 401，认证边界保留。HTML 内脚本正确转义关闭标签，不依赖额外的核心 bootstrap HTTP 请求。
+- 本机 MSVC release 构建通过；Node 全量 42 项测试通过。原生 WebView2 与无头 WebKit 完成 22 张截图的离屏检查，包含首次加载、页面刷新、重新加载配置及会话恢复。WebKit 故障注入阻断外部核心 bootstrap 请求后，页面仍正常启动；另直接验证无凭据入口为 401 / no-store。
+- 离屏 WebView2 仅添加远程调试端口，使用普通浏览器安全特性。报告在 work/ui-checks/report.json，构建、测试和界面日志为 work/bootstrap-build.log、work/bootstrap-tests.log 与 work/bootstrap-ui.log。旧版正在运行的窗口未强制关闭，退出托盘后启动 target/release/pekopet.exe 使用新版本。
+
 ## 草莓兔兔与私有模型库 · 2026-11-11
 
 - 新建 entropy622/Live2DModels 私有仓库，PekoPet 的 models submodule 固定引用其提交。收录用户提供的草莓兔兔 DLC 原始运行文件，以及现有 DeepSeek-chan、Yumi、冰糖和艾莲；原目录、中文文件名和作者说明保留，纹理与 moc3 使用 Git LFS。私有库自身提供通用 catalog.json、来源清单和验证入口，其他个人项目可直接作为 submodule 使用。

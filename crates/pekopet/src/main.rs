@@ -556,7 +556,7 @@ fn main() {
                     tauri::webview::NewWindowResponse::Deny
                 })
                 .on_navigation(move|url|url.scheme()=="tauri"||url.host_str()==Some("tauri.localhost")||trusted.lock().unwrap().as_ref().is_some_and(|origin|url.origin().ascii_serialization()==*origin));
-            if let Some(port)=std::env::var_os("PEKO_UI_CHECK_PORT"){builder=builder.additional_browser_args(&format!("--remote-debugging-port={} --disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection",port.to_string_lossy()));}
+            if let Some(port)=std::env::var_os("PEKO_UI_CHECK_PORT"){builder=builder.additional_browser_args(&format!("--remote-debugging-port={}",port.to_string_lossy()));}
             if test{builder=builder.data_directory(root.join("work/test-webview"));}
             let portrait=native::portrait_path("yumi");
             if portrait.exists(){builder=builder.icon(tauri::image::Image::from_path(&portrait)?)?;}
